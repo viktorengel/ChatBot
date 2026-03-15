@@ -48,8 +48,8 @@ $niveles_sistema = [
     ],
 ];
 
-// Obtener tab activo
 $tab_activo = $_POST['tab_actual'] ?? $_GET['tab'] ?? 'inst';
+$jornada_activa = $_POST['jornada_activa'] ?? '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['accion'])) {
 
@@ -71,38 +71,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['accion'])) {
         $msg = "Jornadas guardadas correctamente";
 
     } elseif ($_POST['accion'] === 'guardar_niveles') {
-    $jornada_id = intval($_POST['jornada_id']);
-    $niveles_sel = $_POST['niveles'] ?? [];
+        $jornada_id = intval($_POST['jornada_id']);
+        $niveles_sel = $_POST['niveles'] ?? [];
 
-    // Obtener niveles actuales para no borrar paralelos de los que se mantienen
-    $niveles_actuales = $conn->query("SELECT id, codigo FROM config_niveles WHERE jornada_id = $jornada_id");
-    $codigos_existentes = [];
-    while ($n = $niveles_actuales->fetch_assoc()) {
-        $codigos_existentes[$n['codigo']] = $n['id'];
-    }
+        $niveles_actuales = $conn->query("SELECT id, codigo FROM config_niveles WHERE jornada_id = $jornada_id");
+        $codigos_existentes = [];
+        while ($n = $niveles_actuales->fetch_assoc()) {
+            $codigos_existentes[$n['codigo']] = $n['id'];
+        }
 
-    // Desactivar solo los que NO están en la selección
-    $conn->query("UPDATE config_niveles SET activo = 0 WHERE jornada_id = $jornada_id");
+        $conn->query("UPDATE config_niveles SET activo = 0 WHERE jornada_id = $jornada_id");
 
-    foreach ($niveles_sel as $codigo) {
-        $nombre_nivel = '';
-        foreach ($niveles_sistema as $niveles) {
-            foreach ($niveles as $n) {
-                if ($n['codigo'] === $codigo) { $nombre_nivel = $n['nombre']; break 2; }
+        foreach ($niveles_sel as $codigo) {
+            $nombre_nivel = '';
+            foreach ($niveles_sistema as $niveles) {
+                foreach ($niveles as $n) {
+                    if ($n['codigo'] === $codigo) { $nombre_nivel = $n['nombre']; break 2; }
+                }
+            }
+            if ($nombre_nivel) {
+                if (isset($codigos_existentes[$codigo])) {
+                    $id_existente = $codigos_existentes[$codigo];
+                    $conn->query("UPDATE config_niveles SET activo = 1 WHERE id = $id_existente");
+                } else {
+                    $conn->query("INSERT INTO config_niveles (nombre, codigo, jornada_id, activo) VALUES ('$nombre_nivel', '$codigo', $jornada_id, 1)");
+                }
             }
         }
-        if ($nombre_nivel) {
-            if (isset($codigos_existentes[$codigo])) {
-                // Ya existe — solo reactivar sin tocar paralelos
-                $id_existente = $codigos_existentes[$codigo];
-                $conn->query("UPDATE config_niveles SET activo = 1 WHERE id = $id_existente");
-            } else {
-                // Nuevo nivel — insertar
-                $conn->query("INSERT INTO config_niveles (nombre, codigo, jornada_id, activo) VALUES ('$nombre_nivel', '$codigo', $jornada_id, 1)");
-            }
-        }
-    }
-    $msg = "Niveles guardados correctamente";
+        $msg = "Niveles guardados correctamente";
 
     } elseif ($_POST['accion'] === 'guardar_todos_paralelos') {
         $jornada_id = intval($_POST['jornada_id']);
@@ -116,6 +112,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['accion'])) {
             }
         }
         $msg = "Paralelos guardados correctamente";
+
+    } elseif ($_POST['accion'] === 'eliminar_curso') {
+        $id_curso = intval($_POST['id_curso']);
+        $tiene_estudiantes = $conn->query("SELECT id FROM estudiantes WHERE curso_id = $id_curso LIMIT 1")->num_rows;
+        if ($tiene_estudiantes > 0) {
+            $err = "No se puede eliminar, tiene estudiantes asignados";
+        } else {
+            $conn->query("DELETE FROM docente_cursos WHERE curso_id = $id_curso");
+            $conn->query("DELETE FROM cursos WHERE id = $id_curso");
+            $msg = "Curso eliminado correctamente";
+        }
 
     } elseif ($_POST['accion'] === 'agregar_figura') {
         $nombre = trim($_POST['nombre_figura']);
@@ -212,6 +219,8 @@ header_html('Configuración');
 .par-btn { width: 30px; height: 30px; border-radius: 6px; border: 2px solid #ddd; background: white; cursor: pointer; font-size: 12px; font-weight: bold; color: #777; display: inline-flex; align-items: center; justify-content: center; padding: 0; transition: all 0.15s; }
 .par-btn.sel { border-color: #1a73e8; background: #1a73e8; color: white; }
 .par-btn:hover { border-color: #1a73e8; color: #1a73e8; }
+.grupo-paralelos { margin-bottom: 15px; }
+.grupo-paralelos-titulo { background: #e8f0fe; color: #1a73e8; padding: 6px 12px; border-radius: 6px; font-size: 12px; font-weight: bold; text-transform: uppercase; margin-bottom: 8px; letter-spacing: 0.5px; }
 .figuras-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; margin-bottom: 15px; }
 .figura-card { background: #e8f0fe; border-radius: 8px; padding: 10px 12px; display: flex; justify-content: space-between; align-items: center; font-size: 13px; color: #1a73e8; }
 .figura-card button { background: none; border: none; color: #c5221f; cursor: pointer; font-size: 16px; padding: 0; line-height: 1; }
@@ -314,7 +323,7 @@ header_html('Configuración');
 
                     <div class="jornada-tabs">
                         <?php $primera = true; foreach ($jornadas_activas as $j): ?>
-                        <button type="button" class="jornada-tab-btn <?= $primera?'activo':'' ?>" onclick="mostrarJornada('j<?= $j['id'] ?>', this)">
+                        <button type="button" class="jornada-tab-btn <?= $primera?'activo':'' ?>" onclick="mostrarJornada('j<?= $j['id'] ?>', this)" id="btn-j<?= $j['id'] ?>">
                             <?= $j['nombre'] ?>
                         </button>
                         <?php $primera = false; endforeach; ?>
@@ -339,6 +348,7 @@ header_html('Configuración');
                             <input type="hidden" name="accion" value="guardar_niveles">
                             <input type="hidden" name="jornada_id" value="<?= $jornada['id'] ?>">
                             <input type="hidden" name="tab_actual" value="niveles">
+                            <input type="hidden" name="jornada_activa" value="j<?= $jornada['id'] ?>">
                             <p style="font-size:13px;color:#555;margin-bottom:10px;font-weight:bold">Selecciona los niveles activos:</p>
                             <div class="niveles-columnas">
                                 <?php foreach ($niveles_sistema as $grupo => $niveles): ?>
@@ -351,46 +361,42 @@ header_html('Configuración');
                                         <input type="checkbox" name="niveles[]" value="<?= $nivel['codigo'] ?>" <?= $activo?'checked':'' ?>>
                                         <?= htmlspecialchars($nivel['nombre']) ?>
                                     </label>
-                                    <?php endforeach; ?>
+                                    <?php endforeach; // cursos ?>
                                 </div>
                                 <?php endforeach; ?>
                             </div>
                             <button type="submit" class="btn btn-sm">💾 Guardar niveles</button>
                         </form>
 
-                        <!-- Paralelos — UN SOLO FORMULARIO -->
+                        <!-- Paralelos agrupados por categoría -->
                         <?php
                         $niveles_guardados = $conn->query("SELECT * FROM config_niveles WHERE jornada_id = {$jornada['id']} AND activo = 1 ORDER BY id");
                         $niveles_g = [];
                         while ($n = $niveles_guardados->fetch_assoc()) $niveles_g[] = $n;
+
                         if (!empty($niveles_g)):
+                            // Agrupar por categoría
+                            $niveles_por_grupo = [];
+                            foreach ($niveles_g as $nivel) {
+                                $grupo = '';
+                                foreach ($niveles_sistema as $nombre_grupo => $lista) {
+                                    foreach ($lista as $n) {
+                                        if ($n['codigo'] === $nivel['codigo']) { $grupo = $nombre_grupo; break 2; }
+                                    }
+                                }
+                                $niveles_por_grupo[$grupo][] = $nivel;
+                            }
                         ?>
                         <p style="font-size:13px;color:#555;margin-bottom:8px;font-weight:bold">Configura los paralelos:</p>
                         <form method="POST">
                             <input type="hidden" name="accion" value="guardar_todos_paralelos">
                             <input type="hidden" name="jornada_id" value="<?= $jornada['id'] ?>">
                             <input type="hidden" name="tab_actual" value="niveles">
-                            <?php
-                            // Agrupar niveles por su categoría
-                            $niveles_por_grupo = [];
-                            foreach ($niveles_g as $nivel) {
-                                $grupo = '';
-                                foreach ($niveles_sistema as $nombre_grupo => $lista) {
-                                    foreach ($lista as $n) {
-                                        if ($n['codigo'] === $nivel['codigo']) {
-                                            $grupo = $nombre_grupo;
-                                            break 2;
-                                        }
-                                    }
-                                }
-                                $niveles_por_grupo[$grupo][] = $nivel;
-                            }
-                            foreach ($niveles_por_grupo as $grupo => $niveles_grupo):
-                            ?>
-                            <div style="margin-bottom:15px">
-                                <div style="background:#e8f0fe;color:#1a73e8;padding:6px 12px;border-radius:6px;font-size:12px;font-weight:bold;text-transform:uppercase;margin-bottom:8px;letter-spacing:0.5px">
-                                    📖 <?= htmlspecialchars($grupo) ?>
-                                </div>
+                            <input type="hidden" name="jornada_activa" value="j<?= $jornada['id'] ?>">
+
+                            <?php foreach ($niveles_por_grupo as $grupo => $niveles_grupo): ?>
+                            <div class="grupo-paralelos">
+                                <div class="grupo-paralelos-titulo">📖 <?= htmlspecialchars($grupo) ?></div>
                                 <table class="paralelos-tabla">
                                     <tbody>
                                     <?php foreach ($niveles_grupo as $nivel):
@@ -422,7 +428,6 @@ header_html('Configuración');
                             <?php endforeach; ?>
                             <button type="submit" class="btn btn-green" style="margin-top:5px">💾 Guardar todos los paralelos</button>
                         </form>
-
                         <?php endif; ?>
                     </div>
                     <?php $primera = false; endforeach; ?>
@@ -481,26 +486,86 @@ header_html('Configuración');
                     $cursos_lista = $conn->query("SELECT nombre, nivel, jornada FROM cursos ORDER BY jornada, nivel, nombre");
                     $por_jornada = [];
                     while ($c = $cursos_lista->fetch_assoc()) {
-                        $por_jornada[$c['jornada']][$c['nivel']][] = $c['nombre'];
+                        $cat = 'Otros';
+                        foreach ($niveles_sistema as $nombre_cat => $lista) {
+                            foreach ($lista as $n) {
+                                if ($n['nombre'] === $c['nivel']) { $cat = $nombre_cat; break 2; }
+                            }
+                        }
+                        $por_jornada[$c['jornada']][$cat][$c['nivel']][] = ['nombre' => $c['nombre'], 'id' => $c['id'] ?? null];
                     }
+                    // Ordenar categorías según orden del sistema educativo
+                    $orden_categorias = array_keys($niveles_sistema);
+                    foreach ($por_jornada as $jornada => &$categorias) {
+                        uksort($categorias, function($a, $b) use ($orden_categorias) {
+                            $pos_a = array_search($a, $orden_categorias);
+                            $pos_b = array_search($b, $orden_categorias);
+                            $pos_a = $pos_a === false ? 999 : $pos_a;
+                            $pos_b = $pos_b === false ? 999 : $pos_b;
+                            return $pos_a - $pos_b;
+                        });
+                        // Ordenar niveles dentro de cada categoría
+                        foreach ($categorias as $cat => &$niveles_cat) {
+                            $orden_niveles = [];
+                            if (isset($niveles_sistema[$cat])) {
+                                $orden_niveles = array_column($niveles_sistema[$cat], 'nombre');
+                            }
+                            uksort($niveles_cat, function($a, $b) use ($orden_niveles) {
+                                $pos_a = array_search($a, $orden_niveles);
+                                $pos_b = array_search($b, $orden_niveles);
+                                $pos_a = $pos_a === false ? 999 : $pos_a;
+                                $pos_b = $pos_b === false ? 999 : $pos_b;
+                                return $pos_a - $pos_b;
+                            });
+                        }
+                        unset($niveles_cat);
+                    }
+                    unset($categorias);
+                    // Obtener IDs
+                    $cursos_ids = [];
+                    $q_ids = $conn->query("SELECT id, nombre FROM cursos");
+                    while ($ci = $q_ids->fetch_assoc()) $cursos_ids[$ci['nombre']] = $ci['id'];
                 ?>
                 <div class="config-section">
                     <h3>📋 Cursos generados</h3>
-                    <?php foreach ($por_jornada as $jornada => $niveles): ?>
+                    <?php foreach ($por_jornada as $jornada => $categorias): ?>
                     <div style="margin-bottom:18px">
                         <div style="background:#1557b0;color:white;padding:7px 14px;border-radius:6px;font-size:13px;font-weight:bold;margin-bottom:10px">
                             🕐 Jornada <?= htmlspecialchars($jornada) ?>
                         </div>
-                        <?php foreach ($niveles as $nivel => $cursos): ?>
-                        <div style="margin-bottom:10px">
-                            <div style="font-size:12px;font-weight:bold;color:#1a73e8;margin-bottom:6px;padding-left:5px;border-left:3px solid #1a73e8">
-                                <?= htmlspecialchars($nivel) ?>
+                        <?php foreach ($categorias as $categoria => $niveles): ?>
+                        <div style="margin-bottom:12px">
+                            <div style="background:#e8f0fe;color:#1a73e8;padding:5px 12px;border-radius:6px;font-size:12px;font-weight:bold;text-transform:uppercase;margin-bottom:8px">
+                                📖 <?= htmlspecialchars($categoria) ?>
                             </div>
-                            <div class="cursos-preview-grid">
-                                <?php foreach ($cursos as $nombre): ?>
-                                <div class="curso-preview-item"><?= htmlspecialchars($nombre) ?></div>
+                            <?php foreach ($niveles as $nivel => $cursos): ?>
+                            <div style="margin-bottom:8px;padding-left:10px">
+                                <div style="font-size:12px;color:#555;font-weight:bold;margin-bottom:4px">
+                                    <?= htmlspecialchars($nivel) ?>
+                                </div>
+                                <div class="cursos-preview-grid">
+                                <?php foreach ($cursos as $c_item):
+                                    $nombre = $c_item['nombre'];
+                                ?>
+                                <div class="curso-preview-item" style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+                                <span><?= htmlspecialchars($nombre) ?></span>
+                                <?php
+                                $curso_q = $conn->query("SELECT id FROM cursos WHERE nombre = '" . $conn->real_escape_string($nombre) . "' LIMIT 1");
+                                $curso_row = $curso_q->fetch_assoc();
+                                if ($curso_row):
+                                ?>
+                                <form method="POST" style="display:inline;margin:0" onsubmit="return confirm('¿Eliminar este curso?')">
+                                    <input type="hidden" name="accion" value="eliminar_curso">
+                                    <input type="hidden" name="id_curso" value="<?= $curso_row['id'] ?>">
+                                    <input type="hidden" name="tab_actual" value="generar">
+                                    <button type="submit" style="background:none;border:none;color:#c5221f;cursor:pointer;font-size:16px;padding:0;line-height:1" title="Eliminar curso">✕</button>
+                                </form>
+                                <?php endif; ?>
+                            </div>
                                 <?php endforeach; ?>
+                                </div>
                             </div>
+                            <?php endforeach; ?>
                         </div>
                         <?php endforeach; ?>
                     </div>
@@ -541,6 +606,15 @@ function toggleParalelo(btn, letra, nivelId) {
         input.value = letra;
         container.appendChild(input);
     }
+}
+
+// Restaurar jornada activa después de guardar
+var jornadaActiva = '<?= htmlspecialchars($jornada_activa) ?>';
+if (jornadaActiva) {
+    window.addEventListener('DOMContentLoaded', function() {
+        var btn = document.getElementById('btn-' + jornadaActiva);
+        if (btn) mostrarJornada(jornadaActiva, btn);
+    });
 }
 </script>
 

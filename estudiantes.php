@@ -62,9 +62,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['accion'])) {
     }
 }
 
-$cursos = $conn->query("SELECT * FROM cursos ORDER BY jornada, nivel, nombre");
+$cursos_q = $conn->query("SELECT * FROM cursos ORDER BY jornada, nivel, nombre");
 $cursos_arr = [];
-while ($c = $cursos->fetch_assoc()) $cursos_arr[] = $c;
+while ($c = $cursos_q->fetch_assoc()) $cursos_arr[] = $c;
 
 $representantes_todos = $conn->query("SELECT * FROM representantes ORDER BY nombre");
 $reps_arr = [];

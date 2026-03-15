@@ -1,0 +1,1 @@
+<?php echo count(file('/home/ecuasysc/as.ecuasys.com/configuracion.php')); ?>
