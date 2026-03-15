@@ -16,18 +16,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['archivo'])) {
     } elseif ($archivo['error'] !== UPLOAD_ERR_OK) {
         $resultado = ['error' => 'Error al subir el archivo'];
     } else {
-        $tmp = $archivo['tmp_name'];
-        $stats = procesarExcel($tmp, $conn);
-        $resultado = $stats;
+        $resultado = procesarExcel($archivo['tmp_name'], $conn);
     }
 }
 
 function procesarExcel($archivo, $conn) {
-    // Leer el Excel manualmente (sin librería externa)
     $zip = new ZipArchive();
-    if ($zip->open($archivo) !== TRUE) {
-        return ['error' => 'No se pudo abrir el archivo Excel'];
-    }
+    if ($zip->open($archivo) !== TRUE) return ['error' => 'No se pudo abrir el archivo Excel'];
 
     $xml = $zip->getFromName('xl/worksheets/sheet1.xml');
     $strings_xml = $zip->getFromName('xl/sharedStrings.xml');
@@ -40,11 +35,19 @@ function procesarExcel($archivo, $conn) {
     if ($strings_xml) {
         $sxml = simplexml_load_string($strings_xml);
         foreach ($sxml->si as $si) {
-            $strings[] = (string)($si->t ?? implode('', (array)$si->r->t ?? []));
+            $t = '';
+            if (isset($si->t)) {
+                $t = (string)$si->t;
+            } elseif (isset($si->r)) {
+                foreach ($si->r as $r) {
+                    if (isset($r->t)) $t .= (string)$r->t;
+                }
+            }
+            $strings[] = $t;
         }
     }
 
-    // Parsear celdas
+    // Parsear celdas (soporta sharedStrings e inlineStr)
     $sheet = simplexml_load_string($xml);
     $rows = [];
     foreach ($sheet->sheetData->row as $row) {
@@ -53,106 +56,103 @@ function procesarExcel($archivo, $conn) {
             $col_letter = preg_replace('/[0-9]/', '', (string)$cell['r']);
             $col_index = col_to_index($col_letter);
             $type = (string)$cell['t'];
-            $value = (string)$cell->v;
+            $value = '';
             if ($type === 's') {
-                $value = $strings[(int)$value] ?? '';
+                // sharedStrings
+                $value = $strings[(int)(string)$cell->v] ?? '';
+            } elseif ($type === 'inlineStr') {
+                // inline string (formato openpyxl)
+                $value = (string)$cell->is->t;
+            } else {
+                $value = (string)$cell->v;
             }
             $row_data[$col_index] = trim($value);
         }
         $rows[] = $row_data;
     }
 
-    // Buscar fila de encabezados (donde está "apellido_nombre")
+    // Buscar fila de encabezados
     $header_row = -1;
     foreach ($rows as $idx => $row) {
-        if (isset($row[0]) && strtolower($row[0]) === 'apellido_nombre') {
+        $first = strtolower(trim($row[0] ?? ''));
+        if (in_array($first, ['jornada', '* jornada'])) {
             $header_row = $idx;
             break;
         }
     }
 
-    if ($header_row === -1) {
-        return ['error' => 'No se encontró la fila de encabezados. Asegúrate de usar la plantilla correcta.'];
-    }
+    if ($header_row === -1) return ['error' => 'No se encontró la fila de encabezados. Usa la plantilla correcta.'];
 
-    // Procesar filas de datos
     $importados = 0;
     $omitidos = 0;
     $errores = [];
 
-    for ($i = $header_row + 1; $i < count($rows); $i++) {
+    for ($i = $header_row + 2; $i < count($rows); $i++) {
         $row = $rows[$i];
 
-        $nombre     = $row[0] ?? '';
-        $curso      = $row[1] ?? '';
-        $rep1_nom   = $row[2] ?? '';
-        $rep1_tel   = preg_replace('/\D/', '', $row[3] ?? '');
-        $rep2_nom   = $row[4] ?? '';
-        $rep2_tel   = preg_replace('/\D/', '', $row[5] ?? '');
+        $jornada    = trim($row[0] ?? '');
+        $nivel      = trim($row[1] ?? '');
+        $paralelo   = trim($row[2] ?? '');
+        $nombre     = trim($row[3] ?? '');
+        $rep1_nom   = trim($row[4] ?? '');
+        $rep1_tel   = normalizar_telefono($row[5] ?? '');
+        $rep2_nom   = trim($row[6] ?? '');
+        $rep2_tel   = normalizar_telefono($row[7] ?? '');
 
         // Saltar filas vacías o de ejemplo
-        if (empty($nombre) || empty($curso) || empty($rep1_nom) || empty($rep1_tel)) {
-            if (!empty($nombre)) $errores[] = "Fila " . ($i+1) . ": '$nombre' omitido por datos incompletos";
+        if (empty($nombre) || empty($jornada) || empty($nivel) || empty($paralelo)) continue;
+        if (stripos($nombre, 'Pérez García Carlos') !== false) continue;
+        if (stripos($nombre, 'Mora Suárez Ana') !== false) continue;
+        if (stripos($nombre, 'López Torres Diego') !== false) continue;
+
+        // Construir nombre del curso: nivel "paralelo" — jornada
+        $nombre_curso = "$nivel \"$paralelo\" — $jornada";
+
+        // Buscar curso en la base de datos
+        $stmt = $conn->prepare("SELECT id FROM cursos WHERE nombre = ?");
+        $stmt->bind_param("s", $nombre_curso);
+        $stmt->execute();
+        $curso_row = $stmt->get_result()->fetch_assoc();
+
+        if (!$curso_row) {
+            $errores[] = "Fila " . ($i+1) . ": Curso '$nombre_curso' no existe en el sistema";
             continue;
         }
+        $curso_id = $curso_row['id'];
 
-        // Saltar filas de ejemplo
-        if (strpos(strtolower($nombre), 'pérez garcía carlos') !== false) continue;
-
-        // Obtener o crear curso
-        $curso_id = obtenerOCrear($conn, 'cursos', 'nombre', $curso);
-
-        // Obtener o crear representante 1
-        $rep1_id = obtenerOCrearRepresentante($conn, $rep1_nom, $rep1_tel);
-
-        // Obtener o crear representante 2
-        $rep2_id = null;
-        if (!empty($rep2_nom) && !empty($rep2_tel)) {
-            $rep2_id = obtenerOCrearRepresentante($conn, $rep2_nom, $rep2_tel);
-        }
-
-        // Verificar si el estudiante ya existe
-        $stmt = $conn->prepare("SELECT id FROM estudiantes WHERE nombre = ? AND curso_id = ?");
-        $stmt->bind_param("si", $nombre, $curso_id);
-        $stmt->execute();
-        if ($stmt->get_result()->num_rows > 0) {
+        // Verificar si ya existe el estudiante en ese curso
+        $check = $conn->prepare("SELECT id FROM estudiantes WHERE nombre = ? AND curso_id = ?");
+        $check->bind_param("si", $nombre, $curso_id);
+        $check->execute();
+        if ($check->get_result()->num_rows > 0) {
             $omitidos++;
             continue;
         }
 
         // Insertar estudiante
-        if ($rep2_id) {
-            $stmt = $conn->prepare("INSERT INTO estudiantes (nombre, curso_id, representante_id, representante2_id) VALUES (?, ?, ?, ?)");
-            $stmt->bind_param("siii", $nombre, $curso_id, $rep1_id, $rep2_id);
-        } else {
-            $stmt = $conn->prepare("INSERT INTO estudiantes (nombre, curso_id, representante_id) VALUES (?, ?, ?)");
-            $stmt->bind_param("sii", $nombre, $curso_id, $rep1_id);
+        $stmt2 = $conn->prepare("INSERT INTO estudiantes (nombre, curso_id) VALUES (?, ?)");
+        $stmt2->bind_param("si", $nombre, $curso_id);
+        if (!$stmt2->execute()) {
+            $errores[] = "Fila " . ($i+1) . ": Error al insertar '$nombre'";
+            continue;
+        }
+        $estudiante_id = $conn->insert_id;
+        $importados++;
+
+        // Representante 1
+        if (!empty($rep1_nom) && !empty($rep1_tel)) {
+            $rep1_id = obtenerOCrearRepresentante($conn, $rep1_nom, $rep1_tel);
+            $conn->query("INSERT IGNORE INTO estudiante_representante (estudiante_id, representante_id, es_principal) VALUES ($estudiante_id, $rep1_id, 1)");
         }
 
-        if ($stmt->execute()) {
-            $importados++;
-        } else {
-            $errores[] = "Error al importar '$nombre': " . $conn->error;
+        // Representante 2
+        if (!empty($rep2_nom) && !empty($rep2_tel)) {
+            $rep2_id = obtenerOCrearRepresentante($conn, $rep2_nom, $rep2_tel);
+            $conn->query("INSERT IGNORE INTO estudiante_representante (estudiante_id, representante_id, es_principal) VALUES ($estudiante_id, $rep2_id, 0)");
         }
     }
 
-    return [
-        'importados' => $importados,
-        'omitidos' => $omitidos,
-        'errores' => $errores
-    ];
-}
-
-function obtenerOCrear($conn, $tabla, $campo, $valor) {
-    $stmt = $conn->prepare("SELECT id FROM $tabla WHERE $campo = ?");
-    $stmt->bind_param("s", $valor);
-    $stmt->execute();
-    $row = $stmt->get_result()->fetch_assoc();
-    if ($row) return $row['id'];
-    $stmt2 = $conn->prepare("INSERT INTO $tabla ($campo) VALUES (?)");
-    $stmt2->bind_param("s", $valor);
-    $stmt2->execute();
-    return $conn->insert_id;
+    return ['importados' => $importados, 'omitidos' => $omitidos, 'errores' => $errores];
 }
 
 function obtenerOCrearRepresentante($conn, $nombre, $telefono) {
@@ -179,42 +179,38 @@ function col_to_index($col) {
 header_html('Importar Estudiantes');
 ?>
 <div class="container">
-
     <div class="card">
         <h2>📥 Importar Estudiantes desde Excel</h2>
-
-        <p style="margin-bottom:15px;color:#555;font-size:14px;">
-            Descarga la plantilla, llénala con los datos de los estudiantes y súbela aquí.
+        <p style="color:#555;font-size:14px;margin-bottom:20px">
+            Descarga la plantilla, completa los datos y sube el archivo aquí. 
+            Los estudiantes ya existentes en el mismo curso serán omitidos automáticamente.
         </p>
 
-        <a href="plantilla_estudiantes.xlsx" class="btn btn-green" style="display:inline-block;margin-bottom:20px;text-decoration:none;">
+        <a href="plantilla_estudiantes.xlsx" class="btn btn-green" style="text-decoration:none;display:inline-block;margin-bottom:20px">
             📄 Descargar Plantilla Excel
         </a>
 
         <form method="POST" enctype="multipart/form-data">
             <div class="form-group">
                 <label>Seleccionar archivo Excel (.xlsx)</label>
-                <input type="file" name="archivo" accept=".xlsx" required style="padding:8px;">
+                <input type="file" name="archivo" accept=".xlsx" required style="padding:8px">
             </div>
-            <button type="submit" class="btn">📤 Importar Estudiantes</button>
+            <button type="submit" class="btn">📤 Importar</button>
         </form>
     </div>
 
     <?php if ($resultado): ?>
     <div class="card">
-        <h2>📊 Resultado de la Importación</h2>
-
+        <h2>📊 Resultado</h2>
         <?php if (isset($resultado['error'])): ?>
             <div class="alerta error">❌ <?= htmlspecialchars($resultado['error']) ?></div>
-
         <?php else: ?>
             <div class="alerta exito">
-                ✅ <strong><?= $resultado['importados'] ?> estudiantes importados correctamente</strong>
+                ✅ <strong><?= $resultado['importados'] ?> estudiante(s) importado(s) correctamente</strong>
                 <?php if ($resultado['omitidos'] > 0): ?>
-                    <br>⏭ <?= $resultado['omitidos'] ?> estudiantes omitidos (ya existían)
+                    <br>⏭ <?= $resultado['omitidos'] ?> omitido(s) por ya existir
                 <?php endif; ?>
             </div>
-
             <?php if (!empty($resultado['errores'])): ?>
             <div class="alerta error">
                 <strong>Advertencias:</strong><br>
@@ -223,13 +219,12 @@ header_html('Importar Estudiantes');
                 <?php endforeach; ?>
             </div>
             <?php endif; ?>
-
-            <a href="estudiantes.php" class="btn" style="text-decoration:none;display:inline-block;margin-top:10px;">
+            <a href="estudiantes.php" class="btn" style="text-decoration:none;display:inline-block;margin-top:10px">
                 👤 Ver lista de estudiantes
             </a>
         <?php endif; ?>
     </div>
     <?php endif; ?>
-
 </div>
+
 <?php footer_html(); $conn->close(); ?>
