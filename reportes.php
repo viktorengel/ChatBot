@@ -125,6 +125,9 @@ header_html('Reportes');
                 </div>
 
             </div>
+        <div style="text-align:right;margin-top:10px">
+                <button type="button" class="btn" style="background:#777" onclick="limpiarFiltros()">🧹 Limpiar filtros</button>
+            </div>
         </div>
     </div>
 
@@ -220,6 +223,16 @@ function actualizarTabla() {
     aplicarFiltros();
 }
 setInterval(actualizarTabla, 30000);
+
+function limpiarFiltros() {
+    document.getElementById('fecha_desde').value = new Date().toISOString().slice(0,8) + '01';
+    document.getElementById('fecha_hasta').value = new Date().toISOString().slice(0,10);
+    document.getElementById('filtro_curso').value = '';
+    var docente = document.getElementById('filtro_docente');
+    if (docente) docente.value = '';
+    document.getElementById('filtro_estado').value = '';
+    aplicarFiltros();
+}
 
 // Cargar al inicio
 window.addEventListener('DOMContentLoaded', aplicarFiltros);

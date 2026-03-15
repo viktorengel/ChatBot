@@ -7,44 +7,35 @@ date_default_timezone_set('America/Guayaquil');
 $conn = conectar();
 $hoy = date('Y-m-d');
 
-// Obtener cursos para el filtro
-if (esAdmin()) {
-    $cursos_filtro = $conn->query("
-        SELECT DISTINCT c.id, c.nombre, c.jornada
-        FROM cursos c
-        JOIN estudiantes e ON e.curso_id = c.id
-        JOIN estudiante_representante er ON er.estudiante_id = e.id
-        ORDER BY c.jornada, c.nombre
-    ");
-} else {
-    $did = $_SESSION['docente_id'];
-    $cursos_filtro = $conn->query("
-        SELECT DISTINCT c.id, c.nombre, c.jornada
-        FROM cursos c
-        JOIN estudiantes e ON e.curso_id = c.id
-        JOIN estudiante_representante er ON er.estudiante_id = e.id
-        JOIN docente_cursos dc ON dc.curso_id = c.id
-        WHERE dc.docente_id = $did
-        ORDER BY c.jornada, c.nombre
-    ");
-}
-
-$cursos_arr = [];
-while ($c = $cursos_filtro->fetch_assoc()) $cursos_arr[] = $c;
+$jornadas = $conn->query("SELECT * FROM config_jornadas WHERE activa = 1 ORDER BY orden");
+$jornadas_arr = [];
+while ($j = $jornadas->fetch_assoc()) $jornadas_arr[] = $j;
 
 header_html('Registrar Falta');
 ?>
 <style>
-.filtro-estudiante { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+.busqueda-grid { border: 1px solid #ddd; border-radius: 8px; overflow: hidden; margin-bottom: 15px; }
+.busqueda-col { padding: 15px; }
+.busqueda-col:first-child { border-bottom: 1px solid #ddd; background: #fafafa; }
+.busqueda-col h4 { font-size: 13px; color: #1a73e8; font-weight: bold; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 0.5px; }
+.cascada-select { width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 6px; font-size: 13px; margin-bottom: 8px; }
 .buscador-wrap { position: relative; }
-.buscador-wrap input { width: 100%; padding: 10px 10px 10px 35px; }
-.buscador-icon { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: #999; font-size: 16px; }
-.estudiantes-lista { display: none; position: absolute; background: white; border: 1px solid #ddd; border-radius: 6px; width: 100%; max-height: 250px; overflow-y: auto; z-index: 100; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
-.estudiante-opcion { padding: 10px 14px; cursor: pointer; font-size: 14px; border-bottom: 1px solid #f0f0f0; }
-.estudiante-opcion:hover, .estudiante-opcion.seleccionado { background: #e8f0fe; color: #1a73e8; }
-.estudiante-opcion .curso-tag { font-size: 11px; color: #777; display: block; margin-top: 2px; }
-.estudiante-seleccionado { background: #e8f0fe; border: 2px solid #1a73e8; border-radius: 6px; padding: 10px 14px; font-size: 14px; color: #1a73e8; display: none; cursor: pointer; }
-.estudiante-seleccionado span { font-size: 12px; color: #555; display: block; }
+.buscador-wrap input { width: 100%; padding: 9px 9px 9px 32px; border: 1px solid #ddd; border-radius: 6px; font-size: 13px; }
+.buscador-icon { position: absolute; left: 9px; top: 50%; transform: translateY(-50%); color: #999; font-size: 14px; }
+.dropdown-lista { display: none; position: absolute; background: white; border: 1px solid #ddd; border-radius: 6px; width: 100%; max-height: 200px; overflow-y: auto; z-index: 100; box-shadow: 0 4px 15px rgba(0,0,0,0.12); top: 100%; left: 0; }
+.dropdown-item { padding: 8px 12px; cursor: pointer; font-size: 13px; border-bottom: 1px solid #f0f0f0; }
+.dropdown-item:hover { background: #e8f0fe; color: #1a73e8; }
+.dropdown-item .subtexto { font-size: 11px; color: #777; display: block; }
+.seleccionados-seccion { padding: 12px 15px; border-top: 1px solid #ddd; background: white; }
+.seleccionados-seccion h4 { font-size: 13px; color: #555; margin-bottom: 8px; }
+.seleccionados-tags { display: flex; flex-wrap: wrap; gap: 6px; min-height: 32px; }
+.sel-tag { background: #e8f0fe; color: #1a73e8; border-radius: 20px; padding: 4px 10px 4px 12px; font-size: 12px; display: flex; align-items: center; gap: 5px; }
+.sel-tag .quitar { background: #1a73e8; color: white; border: none; border-radius: 50%; width: 16px; height: 16px; font-size: 10px; cursor: pointer; padding: 0; display: flex; align-items: center; justify-content: center; line-height: 1; }
+.sel-tag .quitar:hover { background: #c5221f; }
+.sin-seleccionados { color: #aaa; font-size: 13px; font-style: italic; padding: 4px 0; }
+.accion-row { padding: 12px 15px; border-top: 1px solid #ddd; display: flex; gap: 10px; align-items: flex-end; background: #f8f9fa; }
+.accion-row .form-group { margin: 0; flex: 0 0 180px; }
+
 </style>
 
 <div class="container">
@@ -58,55 +49,66 @@ header_html('Registrar Falta');
 
     <div class="card">
         <h2>📝 Registrar Falta</h2>
-        <form action="enviar.php" method="POST" id="form-falta">
-            <input type="hidden" name="estudiante_id" id="estudiante_id_hidden">
+        <form action="enviar_multiple.php" method="POST">
+            <div id="hidden-estudiantes"></div>
 
-            <div class="filtro-estudiante">
-                <!-- Filtro por curso -->
-                <div class="form-group" style="margin:0">
-                    <label>Filtrar por curso</label>
-                    <select id="filtro-curso" onchange="filtrarEstudiantes()">
-                        <option value="">-- Todos los cursos --</option>
-                        <?php
-                        $jornada_actual = '';
-                        foreach ($cursos_arr as $c):
-                            if ($c['jornada'] !== $jornada_actual) {
-                                if ($jornada_actual !== '') echo '</optgroup>';
-                                echo '<optgroup label="' . htmlspecialchars($c['jornada']) . '">';
-                                $jornada_actual = $c['jornada'];
-                            }
-                        ?>
-                        <option value="<?= $c['id'] ?>"><?= htmlspecialchars($c['nombre']) ?></option>
-                        <?php endforeach;
-                        if ($jornada_actual !== '') echo '</optgroup>'; ?>
+            <!-- DOS MÉTODOS DE BÚSQUEDA -->
+            <div class="busqueda-grid">
+
+                <!-- MÉTODO 1: BUSCADOR POR NOMBRE -->
+                <div class="busqueda-col">
+                    <h4>🔍 Buscar por nombre</h4>
+                    <div class="buscador-wrap" style="position:relative">
+                        <span class="buscador-icon">🔍</span>
+                        <input type="text" id="buscador-nombre" placeholder="Escribe apellido o nombre..." oninput="buscarPorNombre()" autocomplete="off">
+                        <div class="dropdown-lista" id="lista-nombre"></div>
+                    </div>
+                </div>
+
+                <!-- MÉTODO 2: FILTROS EN CASCADA -->
+                <div class="busqueda-col">
+                    <h4>🗂️ Buscar por curso</h4>
+                    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:8px">
+                        <select class="cascada-select" id="sel-jornada" onchange="cargarNiveles()" style="margin:0">
+                            <option value="">— Jornada —</option>
+                            <?php foreach ($jornadas_arr as $j): ?>
+                            <option value="<?= htmlspecialchars($j['nombre']) ?>"><?= htmlspecialchars($j['nombre']) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                        <select class="cascada-select" id="sel-nivel" onchange="cargarCursos()" disabled style="margin:0">
+                            <option value="">— Nivel —</option>
+                        </select>
+                        <select class="cascada-select" id="sel-curso" onchange="cargarEstudiantesCurso()" disabled style="margin:0">
+                            <option value="">— Curso —</option>
+                        </select>
+                    </div>
+                    <select class="cascada-select" id="sel-estudiantes-curso" multiple style="height:90px;margin:0" onchange="agregarDesdeCascada()">
                     </select>
+                    <small style="color:#777;font-size:11px">Ctrl+clic para seleccionar varios a la vez</small>
                 </div>
+            </div>
 
-                <!-- Fecha -->
-                <div class="form-group" style="margin:0">
+            <!-- ESTUDIANTES SELECCIONADOS -->
+            <div class="seleccionados-seccion">
+                <h4>👥 Estudiantes seleccionados (<span id="contador">0</span>)</h4>
+                <div class="seleccionados-tags" id="seleccionados-tags">
+                    <span class="sin-seleccionados" id="sin-seleccionados">Ningún estudiante seleccionado aún</span>
+                </div>
+            </div>
+
+            <!-- FECHA Y BOTÓN -->
+            <div class="accion-row">
+                <div class="form-group">
                     <label>Fecha</label>
-                    <input type="date" name="fecha" value="<?= date('Y-m-d') ?>" required>
+                    <input type="date" name="fecha" value="<?= $hoy ?>" required>
                 </div>
+                <button type="submit" class="btn" id="btn-registrar" disabled style="opacity:0.5;margin-bottom:0">
+                    📤 Registrar Faltas
+                </button>
+                <button type="button" class="btn" style="background:#777;margin-bottom:0" onclick="limpiarTodo()">
+                    🗑 Limpiar
+                </button>
             </div>
-
-            <!-- Buscador de estudiante -->
-            <div class="form-group" style="position:relative">
-                <label>Buscar estudiante</label>
-                <div class="buscador-wrap">
-                    <span class="buscador-icon">🔍</span>
-                    <input type="text" id="buscador" placeholder="Escribe apellido o nombre..." oninput="buscarEstudiante()" autocomplete="off">
-                </div>
-                <div class="estudiantes-lista" id="lista-estudiantes"></div>
-                <div class="estudiante-seleccionado" id="estudiante-seleccionado" onclick="limpiarSeleccion()">
-                    <strong id="nombre-seleccionado"></strong>
-                    <span id="curso-seleccionado"></span>
-                    <small style="color:#1a73e8">✕ Clic para cambiar</small>
-                </div>
-            </div>
-
-            <button type="submit" class="btn" id="btn-registrar" disabled style="opacity:0.5">
-                📤 Registrar y Notificar por WhatsApp
-            </button>
         </form>
     </div>
 
@@ -162,48 +164,91 @@ header_html('Registrar Falta');
 </div>
 
 <script>
-// Cargar todos los estudiantes con representante y sin falta hoy
 var todosEstudiantes = [];
-var cursoSeleccionado = '';
+var seleccionados = {};
 
 fetch('estudiantes_ajax.php?hoy=<?= $hoy ?>')
     .then(r => r.json())
     .then(data => { todosEstudiantes = data; });
 
-function filtrarEstudiantes() {
-    cursoSeleccionado = document.getElementById('filtro-curso').value;
-    limpiarSeleccion();
-    document.getElementById('buscador').value = '';
-    document.getElementById('lista-estudiantes').style.display = 'none';
+// ===== CASCADA =====
+function cargarNiveles() {
+    var jornada = document.getElementById('sel-jornada').value;
+    var sel = document.getElementById('sel-nivel');
+    sel.innerHTML = '<option value="">— Nivel —</option>';
+    sel.disabled = !jornada;
+    document.getElementById('sel-curso').innerHTML = '<option value="">— Curso —</option>';
+    document.getElementById('sel-curso').disabled = true;
+    document.getElementById('sel-estudiantes-curso').innerHTML = '';
+    if (!jornada) return;
+    fetch('cascada_ajax.php?accion=niveles&jornada=' + encodeURIComponent(jornada))
+        .then(r => r.json())
+        .then(niveles => {
+            niveles.forEach(n => sel.innerHTML += '<option value="' + n + '">' + n + '</option>');
+            sel.disabled = false;
+        });
 }
 
-function buscarEstudiante() {
-    var q = document.getElementById('buscador').value.toLowerCase().trim();
-    var lista = document.getElementById('lista-estudiantes');
+function cargarCursos() {
+    var jornada = document.getElementById('sel-jornada').value;
+    var nivel = document.getElementById('sel-nivel').value;
+    var sel = document.getElementById('sel-curso');
+    sel.innerHTML = '<option value="">— Curso —</option>';
+    sel.disabled = !nivel;
+    document.getElementById('sel-estudiantes-curso').innerHTML = '';
+    if (!nivel) return;
+    fetch('cascada_ajax.php?accion=cursos&jornada=' + encodeURIComponent(jornada) + '&nivel=' + encodeURIComponent(nivel))
+        .then(r => r.json())
+        .then(cursos => {
+            cursos.forEach(c => sel.innerHTML += '<option value="' + c.id + '">' + c.nombre + '</option>');
+            sel.disabled = false;
+        });
+}
 
+function cargarEstudiantesCurso() {
+    var curso_id = document.getElementById('sel-curso').value;
+    var sel = document.getElementById('sel-estudiantes-curso');
+    sel.innerHTML = '';
+    if (!curso_id) return;
+    var disponibles = todosEstudiantes.filter(e => e.curso_id == curso_id && !seleccionados[e.id]);
+    if (disponibles.length === 0) {
+        sel.innerHTML = '<option disabled>Sin estudiantes disponibles</option>';
+        return;
+    }
+    disponibles.forEach(e => {
+        sel.innerHTML += '<option value="' + e.id + '" data-nombre="' + e.nombre + '" data-curso="' + e.curso + '">' + e.nombre + '</option>';
+    });
+}
+
+function agregarDesdeCascada() {
+    var sel = document.getElementById('sel-estudiantes-curso');
+    Array.from(sel.selectedOptions).forEach(opt => {
+        agregarEstudiante(opt.value, opt.getAttribute('data-nombre'), opt.getAttribute('data-curso'));
+    });
+    Array.from(sel.options).forEach(o => o.selected = false);
+    cargarEstudiantesCurso();
+}
+
+// ===== BUSCADOR =====
+function buscarPorNombre() {
+    var q = document.getElementById('buscador-nombre').value.toLowerCase().trim();
+    var lista = document.getElementById('lista-nombre');
+    lista.innerHTML = '';
     if (q.length < 1) { lista.style.display = 'none'; return; }
 
-    var filtrados = todosEstudiantes.filter(function(e) {
-        var coincide_nombre = e.nombre.toLowerCase().includes(q);
-        var coincide_curso = !cursoSeleccionado || e.curso_id == cursoSeleccionado;
-        return coincide_nombre && coincide_curso;
-    });
-
-    lista.innerHTML = '';
+    var filtrados = todosEstudiantes.filter(e => e.nombre.toLowerCase().includes(q) && !seleccionados[e.id]);
 
     if (filtrados.length === 0) {
-        var div = document.createElement('div');
-        div.className = 'estudiante-opcion';
-        div.style.color = '#999';
-        div.textContent = 'Sin resultados';
-        lista.appendChild(div);
+        lista.innerHTML = '<div class="dropdown-item" style="color:#999">Sin resultados</div>';
     } else {
-        filtrados.forEach(function(e) {
+        filtrados.forEach(e => {
             var div = document.createElement('div');
-            div.className = 'estudiante-opcion';
-            div.innerHTML = e.nombre + '<span class="curso-tag">' + e.curso + '</span>';
+            div.className = 'dropdown-item';
+            div.innerHTML = e.nombre + '<span class="subtexto">' + e.curso + '</span>';
             div.addEventListener('click', function() {
-                seleccionarEstudiante(e.id, e.nombre, e.curso);
+                agregarEstudiante(e.id, e.nombre, e.curso);
+                document.getElementById('buscador-nombre').value = '';
+                lista.style.display = 'none';
             });
             lista.appendChild(div);
         });
@@ -211,30 +256,69 @@ function buscarEstudiante() {
     lista.style.display = 'block';
 }
 
-function seleccionarEstudiante(id, nombre, curso) {
-    document.getElementById('estudiante_id_hidden').value = id;
-    document.getElementById('nombre-seleccionado').textContent = nombre;
-    document.getElementById('curso-seleccionado').textContent = curso;
-    document.getElementById('estudiante-seleccionado').style.display = 'block';
-    document.getElementById('buscador').style.display = 'none';
-    document.getElementById('lista-estudiantes').style.display = 'none';
-    document.getElementById('btn-registrar').disabled = false;
-    document.getElementById('btn-registrar').style.opacity = '1';
+// ===== COMÚN =====
+function agregarEstudiante(id, nombre, curso) {
+    if (seleccionados[id]) return;
+    seleccionados[id] = {nombre: nombre, curso: curso};
+
+    // Quitar mensaje vacío
+    document.getElementById('sin-seleccionados').style.display = 'none';
+
+    // Agregar tag
+    var tag = document.createElement('div');
+    tag.className = 'sel-tag';
+    tag.id = 'tag-' + id;
+    tag.innerHTML = nombre + ' <button type="button" class="quitar" onclick="quitarEstudiante(' + id + ')">✕</button>';
+    document.getElementById('seleccionados-tags').appendChild(tag);
+
+    // Agregar hidden input
+    var input = document.createElement('input');
+    input.type = 'hidden';
+    input.name = 'estudiantes[]';
+    input.value = id;
+    input.id = 'hi-' + id;
+    document.getElementById('hidden-estudiantes').appendChild(input);
+
+    actualizarContador();
 }
 
-function limpiarSeleccion() {
-    document.getElementById('estudiante_id_hidden').value = '';
-    document.getElementById('estudiante-seleccionado').style.display = 'none';
-    document.getElementById('buscador').style.display = 'block';
-    document.getElementById('buscador').value = '';
-    document.getElementById('btn-registrar').disabled = true;
-    document.getElementById('btn-registrar').style.opacity = '0.5';
+function quitarEstudiante(id) {
+    delete seleccionados[id];
+    var tag = document.getElementById('tag-' + id);
+    if (tag) tag.remove();
+    var hi = document.getElementById('hi-' + id);
+    if (hi) hi.remove();
+    actualizarContador();
+    cargarEstudiantesCurso();
 }
 
-// Cerrar lista al hacer clic fuera
+function actualizarContador() {
+    var total = Object.keys(seleccionados).length;
+    document.getElementById('contador').textContent = total;
+    var btn = document.getElementById('btn-registrar');
+    btn.disabled = total === 0;
+    btn.style.opacity = total > 0 ? '1' : '0.5';
+    document.getElementById('sin-seleccionados').style.display = total === 0 ? 'inline' : 'none';
+}
+
+function limpiarTodo() {
+    seleccionados = {};
+    document.getElementById('seleccionados-tags').innerHTML = '<span class="sin-seleccionados" id="sin-seleccionados">Ningún estudiante seleccionado aún</span>';
+    document.getElementById('hidden-estudiantes').innerHTML = '';
+    document.getElementById('buscador-nombre').value = '';
+    document.getElementById('lista-nombre').style.display = 'none';
+    document.getElementById('sel-jornada').value = '';
+    document.getElementById('sel-nivel').innerHTML = '<option value="">— Nivel —</option>';
+    document.getElementById('sel-nivel').disabled = true;
+    document.getElementById('sel-curso').innerHTML = '<option value="">— Curso —</option>';
+    document.getElementById('sel-curso').disabled = true;
+    document.getElementById('sel-estudiantes-curso').innerHTML = '';
+    actualizarContador();
+}
+
 document.addEventListener('click', function(e) {
-    if (!e.target.closest('.buscador-wrap') && !e.target.closest('.estudiantes-lista')) {
-        document.getElementById('lista-estudiantes').style.display = 'none';
+    if (!e.target.closest('.buscador-wrap')) {
+        document.querySelectorAll('.dropdown-lista').forEach(l => l.style.display = 'none');
     }
 });
 
