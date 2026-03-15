@@ -38,7 +38,8 @@ $sql = "
     FROM faltas f
     JOIN estudiantes e ON f.estudiante_id = e.id
     JOIN cursos c ON e.curso_id = c.id
-    JOIN representantes r ON e.representante_id = r.id
+    LEFT JOIN estudiante_representante er ON er.estudiante_id = e.id AND er.es_principal = 1
+    LEFT JOIN representantes r ON er.representante_id = r.id
     $join_docente
     WHERE $where_sql
     ORDER BY f.fecha DESC, f.created_at DESC
@@ -80,19 +81,19 @@ header_html('Reportes');
 
     <div class="card">
         <h2>🔍 Filtros</h2>
-        <form method="GET" id="form-filtros">
+        <div id="form-filtros">
             <div class="filtros">
                 <div class="form-group">
                     <label>Desde</label>
-                    <input type="date" name="fecha_desde" value="<?= $filtro_fecha_desde ?>">
+                    <input type="date" id="fecha_desde" value="<?= $filtro_fecha_desde ?>" onchange="aplicarFiltros()">
                 </div>
                 <div class="form-group">
                     <label>Hasta</label>
-                    <input type="date" name="fecha_hasta" value="<?= $filtro_fecha_hasta ?>">
+                    <input type="date" id="fecha_hasta" value="<?= $filtro_fecha_hasta ?>" onchange="aplicarFiltros()">
                 </div>
                 <div class="form-group">
                     <label>Curso</label>
-                    <select name="curso">
+                    <select id="filtro_curso" onchange="aplicarFiltros()">
                         <option value="">Todos</option>
                         <?php while ($c = $cursos->fetch_assoc()): ?>
                             <option value="<?= $c['id'] ?>" <?= $filtro_curso == $c['id'] ? 'selected' : '' ?>>
@@ -104,7 +105,7 @@ header_html('Reportes');
                 <?php if (esAdmin()): ?>
                 <div class="form-group">
                     <label>Docente</label>
-                    <select name="docente">
+                    <select id="filtro_docente" onchange="aplicarFiltros()">
                         <option value="">Todos</option>
                         <?php while ($d = $docentes->fetch_assoc()): ?>
                             <option value="<?= $d['id'] ?>" <?= $filtro_docente == $d['id'] ? 'selected' : '' ?>>
@@ -116,17 +117,15 @@ header_html('Reportes');
                 <?php endif; ?>
                 <div class="form-group">
                     <label>Estado WhatsApp</label>
-                    <select name="estado">
+                    <select id="filtro_estado" onchange="aplicarFiltros()">
                         <option value="">Todos</option>
                         <option value="enviado" <?= $filtro_estado === 'enviado' ? 'selected' : '' ?>>Enviados</option>
                         <option value="pendiente" <?= $filtro_estado === 'pendiente' ? 'selected' : '' ?>>Pendientes</option>
                     </select>
                 </div>
-                <div class="form-group" style="display:flex;align-items:flex-end;">
-                    <button type="submit" class="btn" style="width:100%">🔍 Filtrar</button>
-                </div>
+
             </div>
-        </form>
+        </div>
     </div>
 
     <div class="stats-grid">
@@ -195,8 +194,19 @@ header_html('Reportes');
 </div>
 
 <script>
-function actualizarTabla() {
-    var params = new URLSearchParams(window.location.search);
+function obtenerFiltros() {
+    var params = new URLSearchParams();
+    params.set('fecha_desde', document.getElementById('fecha_desde').value);
+    params.set('fecha_hasta', document.getElementById('fecha_hasta').value);
+    params.set('curso', document.getElementById('filtro_curso').value);
+    var docente = document.getElementById('filtro_docente');
+    if (docente) params.set('docente', docente.value);
+    params.set('estado', document.getElementById('filtro_estado').value);
+    return params;
+}
+
+function aplicarFiltros() {
+    var params = obtenerFiltros();
     fetch('reportes_ajax.php?' + params.toString())
         .then(r => r.json())
         .then(data => {
@@ -205,7 +215,14 @@ function actualizarTabla() {
         })
         .catch(() => {});
 }
+
+function actualizarTabla() {
+    aplicarFiltros();
+}
 setInterval(actualizarTabla, 30000);
+
+// Cargar al inicio
+window.addEventListener('DOMContentLoaded', aplicarFiltros);
 </script>
 
 <?php footer_html(); $conn->close(); ?>

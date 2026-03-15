@@ -1,8 +1,4 @@
 <?php
-
-ini_set('display_errors', 1);
-error_reporting(E_ALL);
-
 require_once 'auth.php';
 soloAdmin();
 require_once 'config.php';
@@ -62,9 +58,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['accion'])) {
     }
 }
 
-$cursos_q = $conn->query("SELECT * FROM cursos ORDER BY jornada, nivel, nombre");
+$cursos = $conn->query("SELECT * FROM cursos ORDER BY jornada, nivel, nombre");
 $cursos_arr = [];
-while ($c = $cursos_q->fetch_assoc()) $cursos_arr[] = $c;
+while ($c = $cursos->fetch_assoc()) $cursos_arr[] = $c;
 
 $representantes_todos = $conn->query("SELECT * FROM representantes ORDER BY nombre");
 $reps_arr = [];
@@ -213,8 +209,8 @@ header_html('Estudiantes');
                     <?php endif; ?>
                 </div>
 
-                <!-- Vincular representante -->
-                <?php if (!empty($reps_disponibles)): ?>
+                <!-- Vincular representante - máximo 2 -->
+                <?php if (!empty($reps_disponibles) && count($reps_e) < 2): ?>
                 <form method="POST" class="vincular-form">
                     <input type="hidden" name="accion" value="vincular_representante">
                     <input type="hidden" name="estudiante_id" value="<?= $e['id'] ?>">

@@ -25,3 +25,14 @@ function conectar() {
     $conn->set_charset("utf8");
     return $conn;
 }
+
+// ============================================
+// NORMALIZAR TELEFONO ECUATORIANO
+// ============================================
+function normalizar_telefono($telefono) {
+    $tel = preg_replace('/\D/', '', $telefono);
+    if (substr($tel, 0, 3) === '593') return $tel;
+    if (substr($tel, 0, 1) === '0') return '593' . substr($tel, 1);
+    if (strlen($tel) === 9) return '593' . $tel;
+    return $tel;
+}

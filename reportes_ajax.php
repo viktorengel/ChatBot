@@ -37,7 +37,8 @@ $sql = "
     FROM faltas f
     JOIN estudiantes e ON f.estudiante_id = e.id
     JOIN cursos c ON e.curso_id = c.id
-    JOIN representantes r ON e.representante_id = r.id
+    LEFT JOIN estudiante_representante er ON er.estudiante_id = e.id AND er.es_principal = 1
+    LEFT JOIN representantes r ON er.representante_id = r.id
     $join_docente
     WHERE $where_sql
     ORDER BY f.fecha DESC, f.created_at DESC
