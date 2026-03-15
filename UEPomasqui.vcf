@@ -1,10 +1,13 @@
 BEGIN:VCARD
 VERSION:3.0
-FN:UEPomasqui
-ORG:Unidad Educativa Pomasqui
-TITLE:Contacto Institucional
-TEL;TYPE=CELL:+593964259358
-EMAIL:[17h01988@gmail.com](mailto:17h01988@gmail.com)
-ADR:;;Quito;;;Ecuador
+FN:U. E. Pomasqui
+ORG:Institución Educativa Pomasqui
+TEL:+593964259358
+TEL:+59322351072
+EMAIL:17h01988@gmail.com
 URL:https://www.iepomasqui.com
+ADR;TYPE=WORK:;;Av. Manuel Córdova Galarza y Manuela Sáenz, N1-189;Quito;Pichincha;170308;Ecuador
+GEO:-0.05209658762301354; -78.45647145811785
+PHOTO;VALUE=URL:https://www.iepomasqui.com/i/logoiep.jpg
+TITLE:Autoridad
 END:VCARD
