@@ -375,17 +375,33 @@ header_html('Configuración');
                         while ($n = $niveles_guardados->fetch_assoc()) $niveles_g[] = $n;
 
                         if (!empty($niveles_g)):
-                            // Agrupar por categoría
+                            // Agrupar por categoría y ordenar según sistema educativo
                             $niveles_por_grupo = [];
+                            $orden_codigos = [];
+                            foreach ($niveles_sistema as $nombre_grupo => $lista) {
+                                foreach ($lista as $n) $orden_codigos[$n['codigo']] = $nombre_grupo;
+                            }
                             foreach ($niveles_g as $nivel) {
-                                $grupo = '';
-                                foreach ($niveles_sistema as $nombre_grupo => $lista) {
-                                    foreach ($lista as $n) {
-                                        if ($n['codigo'] === $nivel['codigo']) { $grupo = $nombre_grupo; break 2; }
-                                    }
-                                }
+                                $grupo = $orden_codigos[$nivel['codigo']] ?? 'Otros';
                                 $niveles_por_grupo[$grupo][] = $nivel;
                             }
+                            // Ordenar grupos según orden del sistema educativo
+                            $orden_grupos = array_keys($niveles_sistema);
+                            uksort($niveles_por_grupo, function($a, $b) use ($orden_grupos) {
+                                $pa = array_search($a, $orden_grupos);
+                                $pb = array_search($b, $orden_grupos);
+                                return ($pa === false ? 999 : $pa) - ($pb === false ? 999 : $pb);
+                            });
+                            // Ordenar niveles dentro de cada grupo
+                            foreach ($niveles_por_grupo as $grp => &$nivs) {
+                                $orden_niveles = array_column($niveles_sistema[$grp] ?? [], 'codigo');
+                                usort($nivs, function($a, $b) use ($orden_niveles) {
+                                    $pa = array_search($a['codigo'], $orden_niveles);
+                                    $pb = array_search($b['codigo'], $orden_niveles);
+                                    return ($pa === false ? 999 : $pa) - ($pb === false ? 999 : $pb);
+                                });
+                            }
+                            unset($nivs);
                         ?>
                         <p style="font-size:13px;color:#555;margin-bottom:8px;font-weight:bold">Configura los paralelos:</p>
                         <form method="POST">
