@@ -8,12 +8,21 @@ $conn = conectar();
 $msg = '';
 $err = '';
 
-// Crear tablas de configuración si no existen
+// Crear tablas
 $conn->query("CREATE TABLE IF NOT EXISTS config_institucion (clave VARCHAR(100) PRIMARY KEY, valor TEXT)");
 $conn->query("CREATE TABLE IF NOT EXISTS config_jornadas (id INT AUTO_INCREMENT PRIMARY KEY, nombre VARCHAR(50) NOT NULL UNIQUE, activa TINYINT(1) DEFAULT 1, orden INT DEFAULT 0)");
 $conn->query("CREATE TABLE IF NOT EXISTS config_niveles (id INT AUTO_INCREMENT PRIMARY KEY, nombre VARCHAR(100) NOT NULL, codigo VARCHAR(20) NOT NULL, jornada_id INT NOT NULL, activo TINYINT(1) DEFAULT 1, orden INT DEFAULT 0, FOREIGN KEY (jornada_id) REFERENCES config_jornadas(id))");
 $conn->query("CREATE TABLE IF NOT EXISTS config_paralelos (id INT AUTO_INCREMENT PRIMARY KEY, nivel_id INT NOT NULL, letra VARCHAR(5) NOT NULL, UNIQUE KEY unico (nivel_id, letra), FOREIGN KEY (nivel_id) REFERENCES config_niveles(id))");
 $conn->query("CREATE TABLE IF NOT EXISTS config_figuras (id INT AUTO_INCREMENT PRIMARY KEY, nombre VARCHAR(100) NOT NULL UNIQUE)");
+// Nueva tabla: figura por nivel (grado BT) por jornada
+$conn->query("CREATE TABLE IF NOT EXISTS config_nivel_figura (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    nivel_id INT NOT NULL,
+    figura_id INT NOT NULL,
+    UNIQUE KEY unico (nivel_id),
+    FOREIGN KEY (nivel_id) REFERENCES config_niveles(id),
+    FOREIGN KEY (figura_id) REFERENCES config_figuras(id)
+)");
 
 $niveles_sistema = [
     'Inicial' => [
@@ -76,9 +85,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['accion'])) {
 
         $niveles_actuales = $conn->query("SELECT id, codigo FROM config_niveles WHERE jornada_id = $jornada_id");
         $codigos_existentes = [];
-        while ($n = $niveles_actuales->fetch_assoc()) {
-            $codigos_existentes[$n['codigo']] = $n['id'];
-        }
+        while ($n = $niveles_actuales->fetch_assoc()) $codigos_existentes[$n['codigo']] = $n['id'];
 
         $conn->query("UPDATE config_niveles SET activo = 0 WHERE jornada_id = $jornada_id");
 
@@ -91,8 +98,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['accion'])) {
             }
             if ($nombre_nivel) {
                 if (isset($codigos_existentes[$codigo])) {
-                    $id_existente = $codigos_existentes[$codigo];
-                    $conn->query("UPDATE config_niveles SET activo = 1 WHERE id = $id_existente");
+                    $conn->query("UPDATE config_niveles SET activo = 1 WHERE id = {$codigos_existentes[$codigo]}");
                 } else {
                     $conn->query("INSERT INTO config_niveles (nombre, codigo, jornada_id, activo) VALUES ('$nombre_nivel', '$codigo', $jornada_id, 1)");
                 }
@@ -113,16 +119,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['accion'])) {
         }
         $msg = "Paralelos guardados correctamente";
 
-    } elseif ($_POST['accion'] === 'eliminar_curso') {
-        $id_curso = intval($_POST['id_curso']);
-        $tiene_estudiantes = $conn->query("SELECT id FROM estudiantes WHERE curso_id = $id_curso LIMIT 1")->num_rows;
-        if ($tiene_estudiantes > 0) {
-            $err = "No se puede eliminar, tiene estudiantes asignados";
-        } else {
-            $conn->query("DELETE FROM docente_cursos WHERE curso_id = $id_curso");
-            $conn->query("DELETE FROM cursos WHERE id = $id_curso");
-            $msg = "Curso eliminado correctamente";
+    } elseif ($_POST['accion'] === 'guardar_figuras_bt') {
+        // Guardar figura por cada nivel BT de cada jornada
+        $figuras_asignadas = $_POST['figura_nivel'] ?? [];
+        foreach ($figuras_asignadas as $nivel_id => $figura_id) {
+            $nivel_id = intval($nivel_id);
+            $figura_id = intval($figura_id);
+            if ($figura_id > 0) {
+                $conn->query("INSERT INTO config_nivel_figura (nivel_id, figura_id) VALUES ($nivel_id, $figura_id)
+                    ON DUPLICATE KEY UPDATE figura_id = $figura_id");
+            } else {
+                $conn->query("DELETE FROM config_nivel_figura WHERE nivel_id = $nivel_id");
+            }
         }
+        $msg = "Figuras asignadas correctamente";
 
     } elseif ($_POST['accion'] === 'agregar_figura') {
         $nombre = trim($_POST['nombre_figura']);
@@ -133,8 +143,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['accion'])) {
         }
 
     } elseif ($_POST['accion'] === 'eliminar_figura') {
-        $conn->query("DELETE FROM config_figuras WHERE id = " . intval($_POST['id']));
+        $id = intval($_POST['id']);
+        $conn->query("DELETE FROM config_nivel_figura WHERE figura_id = $id");
+        $conn->query("DELETE FROM config_figuras WHERE id = $id");
         $msg = "Figura eliminada";
+
+    } elseif ($_POST['accion'] === 'eliminar_curso') {
+        $id_curso = intval($_POST['id_curso']);
+        $tiene_estudiantes = $conn->query("SELECT id FROM estudiantes WHERE curso_id = $id_curso LIMIT 1")->num_rows;
+        if ($tiene_estudiantes > 0) {
+            $err = "No se puede eliminar, tiene estudiantes asignados";
+        } else {
+            $conn->query("DELETE FROM docente_cursos WHERE curso_id = $id_curso");
+            $conn->query("DELETE FROM cursos WHERE id = $id_curso");
+            $msg = "Curso eliminado correctamente";
+        }
 
     } elseif ($_POST['accion'] === 'generar_cursos') {
         $generados = 0; $omitidos = 0;
@@ -148,16 +171,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['accion'])) {
                 if (empty($letras)) continue;
 
                 if (strpos($nivel['codigo'], 'BT') !== false) {
-                    $figuras = $conn->query("SELECT nombre FROM config_figuras ORDER BY nombre");
-                    while ($fig = $figuras->fetch_assoc()) {
-                        foreach ($letras as $letra) {
-                            $nombre = "{$nivel['nombre']} \"{$letra}\" {$fig['nombre']} — {$jornada['nombre']}";
-                            $check = $conn->query("SELECT id FROM cursos WHERE nombre = '" . $conn->real_escape_string($nombre) . "'");
-                            if ($check->num_rows === 0) {
-                                $conn->query("INSERT INTO cursos (nombre, nivel, jornada) VALUES ('" . $conn->real_escape_string($nombre) . "', '{$nivel['nombre']}', '{$jornada['nombre']}')");
-                                $generados++;
-                            } else $omitidos++;
-                        }
+                    // Obtener la figura asignada a este nivel específico
+                    $fig_q = $conn->query("SELECT f.nombre FROM config_figuras f
+                        JOIN config_nivel_figura cnf ON cnf.figura_id = f.id
+                        WHERE cnf.nivel_id = {$nivel['id']}");
+                    $fig_row = $fig_q->fetch_assoc();
+
+                    if (!$fig_row) {
+                        // Si no tiene figura asignada, saltar
+                        continue;
+                    }
+
+                    foreach ($letras as $letra) {
+                        $nombre = "{$nivel['nombre']} \"{$letra}\" {$fig_row['nombre']} — {$jornada['nombre']}";
+                        $check = $conn->query("SELECT id FROM cursos WHERE nombre = '" . $conn->real_escape_string($nombre) . "'");
+                        if ($check->num_rows === 0) {
+                            $conn->query("INSERT INTO cursos (nombre, nivel, jornada) VALUES ('" . $conn->real_escape_string($nombre) . "', '{$nivel['nombre']}', '{$jornada['nombre']}')");
+                            $generados++;
+                        } else $omitidos++;
                     }
                 } else {
                     foreach ($letras as $letra) {
@@ -232,10 +263,12 @@ header_html('Configuración');
 .btn-generar:hover { background: #e8f0fe; }
 .cursos-preview-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 5px; }
 .curso-preview-item { background: #f8f9fa; border: 1px solid #eee; border-radius: 6px; padding: 5px 10px; font-size: 12px; color: #444; }
-@media(max-width:700px) {
-    .config-layout { grid-template-columns: 1fr; }
-    .niveles-columnas { grid-template-columns: 1fr 1fr; }
-}
+.bt-figura-tabla { width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 10px; }
+.bt-figura-tabla th { background: #fff3e0; color: #e65100; padding: 8px 12px; text-align: left; font-size: 12px; }
+.bt-figura-tabla td { padding: 8px 12px; border-bottom: 1px solid #f0f0f0; vertical-align: middle; }
+.bt-figura-tabla select { width: 100%; padding: 7px; border: 1px solid #ddd; border-radius: 6px; font-size: 13px; }
+.sin-figura { color: #e65100; font-size: 12px; font-style: italic; }
+@media(max-width:700px) { .config-layout { grid-template-columns: 1fr; } .niveles-columnas { grid-template-columns: 1fr 1fr; } }
 </style>
 
 <div class="container" style="max-width:1100px">
@@ -343,7 +376,6 @@ header_html('Configuración');
                     ?>
                     <div class="jornada-content <?= $primera?'activo':'' ?>" id="j<?= $jornada['id'] ?>">
 
-                        <!-- Selección niveles -->
                         <form method="POST" style="margin-bottom:20px">
                             <input type="hidden" name="accion" value="guardar_niveles">
                             <input type="hidden" name="jornada_id" value="<?= $jornada['id'] ?>">
@@ -361,21 +393,19 @@ header_html('Configuración');
                                         <input type="checkbox" name="niveles[]" value="<?= $nivel['codigo'] ?>" <?= $activo?'checked':'' ?>>
                                         <?= htmlspecialchars($nivel['nombre']) ?>
                                     </label>
-                                    <?php endforeach; // cursos ?>
+                                    <?php endforeach; ?>
                                 </div>
                                 <?php endforeach; ?>
                             </div>
                             <button type="submit" class="btn btn-sm">💾 Guardar niveles</button>
                         </form>
 
-                        <!-- Paralelos agrupados por categoría -->
                         <?php
                         $niveles_guardados = $conn->query("SELECT * FROM config_niveles WHERE jornada_id = {$jornada['id']} AND activo = 1 ORDER BY id");
                         $niveles_g = [];
                         while ($n = $niveles_guardados->fetch_assoc()) $niveles_g[] = $n;
 
                         if (!empty($niveles_g)):
-                            // Agrupar por categoría y ordenar según sistema educativo
                             $niveles_por_grupo = [];
                             $orden_codigos = [];
                             foreach ($niveles_sistema as $nombre_grupo => $lista) {
@@ -385,14 +415,12 @@ header_html('Configuración');
                                 $grupo = $orden_codigos[$nivel['codigo']] ?? 'Otros';
                                 $niveles_por_grupo[$grupo][] = $nivel;
                             }
-                            // Ordenar grupos según orden del sistema educativo
                             $orden_grupos = array_keys($niveles_sistema);
                             uksort($niveles_por_grupo, function($a, $b) use ($orden_grupos) {
                                 $pa = array_search($a, $orden_grupos);
                                 $pb = array_search($b, $orden_grupos);
                                 return ($pa === false ? 999 : $pa) - ($pb === false ? 999 : $pb);
                             });
-                            // Ordenar niveles dentro de cada grupo
                             foreach ($niveles_por_grupo as $grp => &$nivs) {
                                 $orden_niveles = array_column($niveles_sistema[$grp] ?? [], 'codigo');
                                 usort($nivs, function($a, $b) use ($orden_niveles) {
@@ -451,11 +479,13 @@ header_html('Configuración');
                 </div>
             </div>
 
-            <!-- FIGURAS -->
+            <!-- FIGURAS TÉCNICAS -->
             <div class="config-panel <?= $tab_activo==='figuras'?'activo':'' ?>" id="panel-figuras">
+
+                <!-- Registrar figuras -->
                 <div class="config-section">
                     <h3>🔧 Figuras del Bachillerato Técnico</h3>
-                    <p style="font-size:13px;color:#777;margin-bottom:15px">Se usarán al generar los cursos del Bachillerato Técnico.</p>
+                    <p style="font-size:13px;color:#777;margin-bottom:15px">Registra las figuras profesionales disponibles en la institución.</p>
                     <div class="figuras-grid">
                         <?php foreach ($figuras_arr as $f): ?>
                         <div class="figura-card">
@@ -482,6 +512,71 @@ header_html('Configuración');
                         <button type="submit" class="btn btn-green">➕ Agregar</button>
                     </form>
                 </div>
+
+                <!-- Asignar figura por grado y jornada -->
+                <?php if (!empty($figuras_arr)):
+                    $jornadas_activas_fig = array_filter($jornadas_arr, fn($j) => $j['activa']);
+                ?>
+                <div class="config-section">
+                    <h3>📋 Asignar Figura por Grado y Jornada</h3>
+                    <p style="font-size:13px;color:#777;margin-bottom:15px">Selecciona qué figura profesional corresponde a cada grado del Bachillerato Técnico en cada jornada.</p>
+
+                    <?php if (empty($jornadas_activas_fig)): ?>
+                        <p style="color:#e65100">⚠️ Primero activa las jornadas.</p>
+                    <?php else: ?>
+                    <form method="POST">
+                        <input type="hidden" name="accion" value="guardar_figuras_bt">
+                        <input type="hidden" name="tab_actual" value="figuras">
+
+                        <?php foreach ($jornadas_activas_fig as $jornada):
+                            // Obtener niveles BT activos en esta jornada
+                            $niveles_bt = $conn->query("
+                                SELECT cn.id, cn.nombre, cnf.figura_id
+                                FROM config_niveles cn
+                                LEFT JOIN config_nivel_figura cnf ON cnf.nivel_id = cn.id
+                                WHERE cn.jornada_id = {$jornada['id']}
+                                AND cn.activo = 1
+                                AND cn.codigo LIKE '%BT%'
+                                ORDER BY cn.id
+                            ");
+                            $bt_arr = [];
+                            while ($n = $niveles_bt->fetch_assoc()) $bt_arr[] = $n;
+                            if (empty($bt_arr)) continue;
+                        ?>
+                        <div style="margin-bottom:20px">
+                            <div style="background:#1557b0;color:white;padding:7px 14px;border-radius:6px;font-size:13px;font-weight:bold;margin-bottom:10px">
+                                🕐 Jornada <?= htmlspecialchars($jornada['nombre']) ?>
+                            </div>
+                            <table class="bt-figura-tabla">
+                                <thead>
+                                    <tr><th>Grado</th><th>Figura Profesional</th></tr>
+                                </thead>
+                                <tbody>
+                                <?php foreach ($bt_arr as $nivel): ?>
+                                <tr>
+                                    <td style="font-weight:bold;width:150px"><?= htmlspecialchars($nivel['nombre']) ?></td>
+                                    <td>
+                                        <select name="figura_nivel[<?= $nivel['id'] ?>]">
+                                            <option value="0">— Sin figura asignada —</option>
+                                            <?php foreach ($figuras_arr as $fig): ?>
+                                            <option value="<?= $fig['id'] ?>" <?= $nivel['figura_id'] == $fig['id'] ? 'selected' : '' ?>>
+                                                <?= htmlspecialchars($fig['nombre']) ?>
+                                            </option>
+                                            <?php endforeach; ?>
+                                        </select>
+                                    </td>
+                                </tr>
+                                <?php endforeach; ?>
+                                </tbody>
+                            </table>
+                        </div>
+                        <?php endforeach; ?>
+
+                        <button type="submit" class="btn btn-green">💾 Guardar asignación de figuras</button>
+                    </form>
+                    <?php endif; ?>
+                </div>
+                <?php endif; ?>
             </div>
 
             <!-- GENERAR -->
@@ -490,7 +585,7 @@ header_html('Configuración');
                     <div class="stat-cursos"><?= $total_cursos ?></div>
                     <p style="margin-top:5px">cursos generados actualmente</p>
                     <h3 style="margin-top:15px">⚡ Generar todos los cursos</h3>
-                    <p>Genera automáticamente todos los cursos. Los ya existentes no se duplican.</p>
+                    <p>Genera automáticamente todos los cursos. Los ya existentes no se duplican. Los grados BT sin figura asignada serán omitidos.</p>
                     <form method="POST">
                         <input type="hidden" name="accion" value="generar_cursos">
                         <input type="hidden" name="tab_actual" value="generar">
@@ -508,36 +603,26 @@ header_html('Configuración');
                                 if ($n['nombre'] === $c['nivel']) { $cat = $nombre_cat; break 2; }
                             }
                         }
-                        $por_jornada[$c['jornada']][$cat][$c['nivel']][] = ['nombre' => $c['nombre'], 'id' => $c['id'] ?? null];
+                        $por_jornada[$c['jornada']][$cat][$c['nivel']][] = ['nombre' => $c['nombre']];
                     }
-                    // Ordenar categorías según orden del sistema educativo
                     $orden_categorias = array_keys($niveles_sistema);
                     foreach ($por_jornada as $jornada => &$categorias) {
                         uksort($categorias, function($a, $b) use ($orden_categorias) {
-                            $pos_a = array_search($a, $orden_categorias);
-                            $pos_b = array_search($b, $orden_categorias);
-                            $pos_a = $pos_a === false ? 999 : $pos_a;
-                            $pos_b = $pos_b === false ? 999 : $pos_b;
-                            return $pos_a - $pos_b;
+                            $pa = array_search($a, $orden_categorias);
+                            $pb = array_search($b, $orden_categorias);
+                            return ($pa === false ? 999 : $pa) - ($pb === false ? 999 : $pb);
                         });
-                        // Ordenar niveles dentro de cada categoría
                         foreach ($categorias as $cat => &$niveles_cat) {
-                            $orden_niveles = [];
-                            if (isset($niveles_sistema[$cat])) {
-                                $orden_niveles = array_column($niveles_sistema[$cat], 'nombre');
-                            }
+                            $orden_niveles = array_column($niveles_sistema[$cat] ?? [], 'nombre');
                             uksort($niveles_cat, function($a, $b) use ($orden_niveles) {
-                                $pos_a = array_search($a, $orden_niveles);
-                                $pos_b = array_search($b, $orden_niveles);
-                                $pos_a = $pos_a === false ? 999 : $pos_a;
-                                $pos_b = $pos_b === false ? 999 : $pos_b;
-                                return $pos_a - $pos_b;
+                                $pa = array_search($a, $orden_niveles);
+                                $pb = array_search($b, $orden_niveles);
+                                return ($pa === false ? 999 : $pa) - ($pb === false ? 999 : $pb);
                             });
                         }
                         unset($niveles_cat);
                     }
                     unset($categorias);
-                    // Obtener IDs
                     $cursos_ids = [];
                     $q_ids = $conn->query("SELECT id, nombre FROM cursos");
                     while ($ci = $q_ids->fetch_assoc()) $cursos_ids[$ci['nombre']] = $ci['id'];
@@ -556,28 +641,23 @@ header_html('Configuración');
                             </div>
                             <?php foreach ($niveles as $nivel => $cursos): ?>
                             <div style="margin-bottom:8px;padding-left:10px">
-                                <div style="font-size:12px;color:#555;font-weight:bold;margin-bottom:4px">
-                                    <?= htmlspecialchars($nivel) ?>
-                                </div>
+                                <div style="font-size:12px;color:#555;font-weight:bold;margin-bottom:4px"><?= htmlspecialchars($nivel) ?></div>
                                 <div class="cursos-preview-grid">
                                 <?php foreach ($cursos as $c_item):
                                     $nombre = $c_item['nombre'];
+                                    $curso_id_tmp = $cursos_ids[$nombre] ?? null;
                                 ?>
                                 <div class="curso-preview-item" style="display:flex;justify-content:space-between;align-items:center;gap:8px">
-                                <span><?= htmlspecialchars($nombre) ?></span>
-                                <?php
-                                $curso_q = $conn->query("SELECT id FROM cursos WHERE nombre = '" . $conn->real_escape_string($nombre) . "' LIMIT 1");
-                                $curso_row = $curso_q->fetch_assoc();
-                                if ($curso_row):
-                                ?>
-                                <form method="POST" style="display:inline;margin:0" onsubmit="return confirm('¿Eliminar este curso?')">
-                                    <input type="hidden" name="accion" value="eliminar_curso">
-                                    <input type="hidden" name="id_curso" value="<?= $curso_row['id'] ?>">
-                                    <input type="hidden" name="tab_actual" value="generar">
-                                    <button type="submit" style="background:none;border:none;color:#c5221f;cursor:pointer;font-size:16px;padding:0;line-height:1" title="Eliminar curso">✕</button>
-                                </form>
-                                <?php endif; ?>
-                            </div>
+                                    <span><?= htmlspecialchars($nombre) ?></span>
+                                    <?php if ($curso_id_tmp): ?>
+                                    <form method="POST" style="display:inline;margin:0" onsubmit="return confirm('¿Eliminar este curso?')">
+                                        <input type="hidden" name="accion" value="eliminar_curso">
+                                        <input type="hidden" name="id_curso" value="<?= $curso_id_tmp ?>">
+                                        <input type="hidden" name="tab_actual" value="generar">
+                                        <button type="submit" style="background:none;border:none;color:#c5221f;cursor:pointer;font-size:16px;padding:0;line-height:1" title="Eliminar">✕</button>
+                                    </form>
+                                    <?php endif; ?>
+                                </div>
                                 <?php endforeach; ?>
                                 </div>
                             </div>
@@ -624,7 +704,6 @@ function toggleParalelo(btn, letra, nivelId) {
     }
 }
 
-// Restaurar jornada activa después de guardar
 var jornadaActiva = '<?= htmlspecialchars($jornada_activa) ?>';
 if (jornadaActiva) {
     window.addEventListener('DOMContentLoaded', function() {
