@@ -120,7 +120,7 @@ header_html('Representantes');
                 </div>
                 <div style="display:flex;gap:6px">
                     <a href="representantes.php?editar=<?= $r['id'] ?>" class="btn btn-green btn-sm" style="text-decoration:none">✏️</a>
-                    <form method="POST" onsubmit="return confirmarEliminar(this, '¿Eliminar a <?= htmlspecialchars($r['nombre']) ?>?')">
+                    <form method="POST" onsubmit="return confirm('¿Eliminar este representante?')">
                         <input type="hidden" name="accion" value="eliminar">
                         <input type="hidden" name="id" value="<?= $r['id'] ?>">
                         <button type="submit" class="btn btn-red btn-sm">🗑</button>

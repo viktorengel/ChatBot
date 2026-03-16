@@ -105,12 +105,16 @@ function procesarExcel($archivo, $conn) {
         if (stripos($nombre, 'Mora Suárez Ana') !== false) continue;
         if (stripos($nombre, 'López Torres Diego') !== false) continue;
 
-        // Construir nombre del curso: nivel "paralelo" — jornada
-        $nombre_curso = "$nivel \"$paralelo\" — $jornada";
+        // Construir búsqueda flexible del curso
+        $prefijo = "$nivel \"$paralelo\"";
+        $sufijo = "— $jornada";
 
-        // Buscar curso en la base de datos
-        $stmt = $conn->prepare("SELECT id FROM cursos WHERE nombre = ?");
-        $stmt->bind_param("s", $nombre_curso);
+        // Buscar curso que coincida con nivel + paralelo + jornada
+        // Funciona con y sin figura profesional
+        $stmt = $conn->prepare("SELECT id FROM cursos WHERE nombre LIKE ? AND nombre LIKE ?");
+        $like_prefijo = $prefijo . '%';
+        $like_sufijo = '%' . $sufijo;
+        $stmt->bind_param("ss", $like_prefijo, $like_sufijo);
         $stmt->execute();
         $curso_row = $stmt->get_result()->fetch_assoc();
 

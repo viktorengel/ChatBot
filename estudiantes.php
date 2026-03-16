@@ -1,4 +1,8 @@
 <?php
+
+ini_set('display_errors', 1);
+error_reporting(E_ALL);
+
 require_once 'auth.php';
 soloAdmin();
 require_once 'config.php';
@@ -181,7 +185,7 @@ header_html('Estudiantes');
                     </div>
                     <div style="display:flex;gap:6px">
                         <a href="estudiantes.php?editar=<?= $e['id'] ?>" class="btn btn-green btn-sm" style="text-decoration:none">✏️</a>
-                        <form method="POST" onsubmit="return confirmarEliminar(this, '¿Eliminar a <?= htmlspecialchars($e['nombre']) ?> y todas sus faltas?')">
+                        <form method="POST" onsubmit="return confirm('¿Eliminar este estudiante y todas sus faltas?')">
                             <input type="hidden" name="accion" value="eliminar">
                             <input type="hidden" name="id" value="<?= $e['id'] ?>">
                             <button type="submit" class="btn btn-red btn-sm">🗑</button>
