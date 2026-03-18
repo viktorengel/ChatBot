@@ -268,7 +268,31 @@ header_html('Configuración');
 .bt-figura-tabla td { padding: 8px 12px; border-bottom: 1px solid #f0f0f0; vertical-align: middle; }
 .bt-figura-tabla select { width: 100%; padding: 7px; border: 1px solid #ddd; border-radius: 6px; font-size: 13px; }
 .sin-figura { color: #e65100; font-size: 12px; font-style: italic; }
-@media(max-width:700px) { .config-layout { grid-template-columns: 1fr; } .niveles-columnas { grid-template-columns: 1fr 1fr; } }
+/* ── RESPONSIVE ── */
+@media (max-width: 900px) {
+    .config-layout { grid-template-columns: 1fr; }
+}
+@media (max-width: 768px) {
+    .niveles-columnas { grid-template-columns: 1fr 1fr; }
+    .figuras-grid { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); }
+    .cursos-preview-grid { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); }
+}
+@media (max-width: 600px) {
+    .niveles-columnas { grid-template-columns: 1fr; }
+    .figuras-grid { grid-template-columns: 1fr 1fr; }
+    .tab-btn { padding: 8px 10px !important; font-size: 12px !important; }
+    .config-tabs { flex-wrap: wrap; }
+    input[type=text], select, input[type=email] { font-size: 16px !important; }
+    .grid2 { grid-template-columns: 1fr !important; }
+    table { font-size: 12px; }
+    td, th { padding: 7px 6px; }
+    .cursos-preview-grid { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 380px) {
+    .figuras-grid { grid-template-columns: 1fr; }
+    .btn { width: 100%; text-align: center; margin-bottom: 5px; }
+    .tab-btn { font-size: 11px !important; padding: 7px 8px !important; }
+}
 </style>
 
 <div class="container" style="max-width:1100px">
@@ -325,7 +349,7 @@ header_html('Configuración');
                     <form method="POST">
                         <input type="hidden" name="accion" value="guardar_jornadas">
                         <input type="hidden" name="tab_actual" value="jornadas">
-                        <div style="display:flex;gap:15px;flex-wrap:wrap;margin-bottom:20px">
+                        <div class="jornadas-flex" style="display:flex;gap:15px;flex-wrap:wrap;margin-bottom:20px">
                             <?php foreach (['Matutina','Vespertina','Nocturna'] as $j):
                                 $activa = false;
                                 foreach ($jornadas_arr as $ja) {

@@ -36,6 +36,22 @@ header_html('Registrar Falta');
 .accion-row { padding: 12px 15px; border-top: 1px solid #ddd; display: flex; gap: 10px; align-items: flex-end; background: #f8f9fa; }
 .accion-row .form-group { margin: 0; flex: 0 0 180px; }
 
+/* ── RESPONSIVE ── */
+.cascada-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 8px; }
+@media (max-width: 600px) {
+    .cascada-grid { grid-template-columns: 1fr; }
+    .busqueda-col { padding: 12px; }
+    .accion-row { flex-direction: column; align-items: stretch; }
+    .accion-row .form-group { flex: unset !important; width: 100%; }
+    .accion-row .btn { width: 100%; text-align: center; margin-bottom: 4px; }
+    select[multiple] { height: 110px; font-size: 16px; }
+    .cascada-select, #buscador-nombre { font-size: 16px !important; }
+    .small-hint { display: none; }
+}
+@media (max-width: 380px) {
+    .card h2 { font-size: 15px; }
+}
+
 </style>
 
 <div class="container">
@@ -68,7 +84,7 @@ header_html('Registrar Falta');
                 <!-- MÉTODO 2: FILTROS EN CASCADA -->
                 <div class="busqueda-col">
                     <h4>🗂️ Buscar por curso</h4>
-                    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:8px">
+                    <div class="cascada-grid">
                         <select class="cascada-select" id="sel-jornada" onchange="cargarNiveles()" style="margin:0">
                             <option value="">— Jornada —</option>
                             <?php foreach ($jornadas_arr as $j): ?>
@@ -84,7 +100,7 @@ header_html('Registrar Falta');
                     </div>
                     <select class="cascada-select" id="sel-estudiantes-curso" multiple style="height:90px;margin:0" onchange="agregarDesdeCascada()">
                     </select>
-                    <small style="color:#777;font-size:11px">Ctrl+clic para seleccionar varios a la vez</small>
+                    <small class="small-hint" style="color:#777;font-size:11px">Ctrl+clic o toca para seleccionar varios a la vez</small>
                 </div>
             </div>
 
@@ -114,7 +130,7 @@ header_html('Registrar Falta');
 
     <div class="card">
         <h2>📋 Últimas Faltas Registradas</h2>
-        <table>
+        <div class="table-responsive"><table>
             <thead>
                 <tr>
                     <th>Fecha</th>
@@ -159,7 +175,7 @@ header_html('Registrar Falta');
                 </tr>
                 <?php endwhile; ?>
             </tbody>
-        </table>
+        </table></div>
     </div>
 </div>
 

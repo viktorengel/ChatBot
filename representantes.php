@@ -86,6 +86,20 @@ header_html('Representantes');
 .grupo-curso-rep { margin-bottom: 8px; }
 .grupo-curso-rep-titulo { font-size: 12px; font-weight: bold; color: #1a73e8; padding: 4px 0; border-bottom: 1px solid #e8f0fe; margin-bottom: 5px; }
 .sin-estudiantes { color: #999; font-size: 13px; font-style: italic; }
+/* ── RESPONSIVE ── */
+@media (max-width: 600px) {
+    .rep-header { flex-direction: column; align-items: flex-start; gap: 8px; }
+    .rep-header > div:last-child { display: flex; gap: 6px; flex-wrap: wrap; }
+    .grid2 { grid-template-columns: 1fr !important; }
+    .estudiante-tag { flex-wrap: wrap; }
+    input[type=text] { font-size: 16px !important; }
+    .btn-sm { padding: 8px 12px; }
+}
+@media (max-width: 380px) {
+    .rep-card { padding: 13px; }
+    .btn { width: 100%; text-align: center; margin-bottom: 5px; }
+}
+
 </style>
 
 <div class="container">

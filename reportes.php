@@ -71,6 +71,42 @@ header_html('Reportes');
 .stat-label { font-size: 13px; color: #777; margin-top: 5px; }
 .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 20px; }
 #ultima-actualizacion { font-size: 12px; color: #777; text-align: right; margin-bottom: 8px; }
+/* ── RESPONSIVE ── */
+@media (max-width: 768px) {
+    .stats-grid { grid-template-columns: 1fr 1fr 1fr; }
+    .filtros { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 600px) {
+    .stats-grid { grid-template-columns: 1fr; gap: 8px; }
+    .filtros { grid-template-columns: 1fr; }
+    .stat-num { font-size: 26px; }
+    input[type=date], select { font-size: 16px !important; }
+    #ultima-actualizacion { font-size: 11px; }
+}
+@media (max-width: 380px) {
+    .stat-box { padding: 10px 8px; }
+    .card h2 { font-size: 15px; }
+}
+
+/* ── TABLA RESPONSIVE FIX ── */
+#tabla-faltas { width: 100%; }
+#tabla-faltas .table-responsive {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+#tabla-faltas table {
+    width: 100%;
+    min-width: 640px;   /* fuerza scroll antes de romperse */
+    border-collapse: collapse;
+}
+#tabla-faltas th, #tabla-faltas td {
+    white-space: nowrap;
+}
+@media (max-width: 600px) {
+    #tabla-faltas th, #tabla-faltas td { font-size: 12px; padding: 7px 6px; }
+}
+
 </style>
 
 <div class="container">
@@ -125,7 +161,7 @@ header_html('Reportes');
                 </div>
 
             </div>
-        <div style="text-align:right;margin-top:10px">
+        <div class="limpiar-wrap" style="text-align:right;margin-top:10px">
                 <button type="button" class="btn" style="background:#777" onclick="limpiarFiltros()">🧹 Limpiar filtros</button>
             </div>
         </div>
@@ -149,8 +185,7 @@ header_html('Reportes');
     <div class="card">
         <h2>📋 Registro de Faltas</h2>
         <div id="ultima-actualizacion">Actualizado: <span id="hora-actualizacion"><?= date('H:i:s') ?></span></div>
-        <div id="tabla-faltas">
-            <table>
+        <div id="tabla-faltas"><div class="table-responsive"><table>
                 <thead>
                     <tr>
                         <th>Fecha</th>
@@ -191,7 +226,7 @@ header_html('Reportes');
                     <?php endforeach; ?>
                     <?php endif; ?>
                 </tbody>
-            </table>
+            </table></div>
         </div>
     </div>
 </div>
@@ -213,7 +248,8 @@ function aplicarFiltros() {
     fetch('reportes_ajax.php?' + params.toString())
         .then(r => r.json())
         .then(data => {
-            document.getElementById('tabla-faltas').innerHTML = data.html;
+            document.getElementById('tabla-faltas').innerHTML =
+                '<div class="table-responsive">' + data.html + '</div>';
             document.getElementById('hora-actualizacion').textContent = data.hora;
         })
         .catch(() => {});

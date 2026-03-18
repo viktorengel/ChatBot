@@ -94,6 +94,29 @@ header_html('Docentes');
 .curso-check-item input { cursor: pointer; width: 16px; height: 16px; }
 .seleccion-info { font-size: 13px; color: #555; }
 .btn-seleccionar-todos { font-size: 12px; color: #1a73e8; background: none; border: none; cursor: pointer; text-decoration: underline; }
+/* ── RESPONSIVE ── */
+@media (max-width: 768px) {
+    .cursos-check-grid { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); }
+    .modal-cursos-box { width: 95%; max-height: 88vh; }
+}
+@media (max-width: 600px) {
+    .docente-header { flex-direction: column; align-items: flex-start; gap: 8px; }
+    .docente-header > div:last-child { display: flex; gap: 6px; flex-wrap: wrap; }
+    .cursos-check-grid { grid-template-columns: 1fr 1fr !important; }
+    .modal-cursos-header { padding: 14px 16px; }
+    .modal-cursos-body { padding: 14px 16px; }
+    .modal-cursos-footer { padding: 12px 16px; flex-direction: column; gap: 8px; }
+    .modal-cursos-footer .btn { width: 100%; text-align: center; }
+    .grid2 { grid-template-columns: 1fr !important; }
+    input[type=text], input[type=email], input[type=password], select { font-size: 16px !important; }
+    .btn-sm { padding: 8px 12px; }
+}
+@media (max-width: 380px) {
+    .cursos-check-grid { grid-template-columns: 1fr !important; }
+    .docente-card { padding: 13px; }
+    .btn { width: 100%; text-align: center; margin-bottom: 5px; }
+}
+
 </style>
 
 <div class="container">

@@ -53,7 +53,7 @@ $es_admin = esAdmin();
 
 ob_start();
 ?>
-<table>
+<div class="table-responsive"><table>
     <thead>
         <tr>
             <th>Fecha</th><th>Estudiante</th><th>Curso</th>
@@ -85,7 +85,7 @@ ob_start();
         <?php endforeach; ?>
         <?php endif; ?>
     </tbody>
-</table>
+</table></div>
 <?php
 $html = ob_get_clean();
 $conn->close();

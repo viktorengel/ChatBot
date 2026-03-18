@@ -103,6 +103,23 @@ header_html('Estudiantes');
 .vincular-form label { font-weight: normal; font-size: 13px; display: flex; align-items: center; gap: 4px; white-space: nowrap; }
 .grupo-curso { margin-bottom: 20px; }
 .grupo-curso-titulo { background: #1557b0; color: white; padding: 8px 15px; border-radius: 8px; font-size: 14px; font-weight: bold; margin-bottom: 10px; }
+/* ── RESPONSIVE ── */
+@media (max-width: 600px) {
+    .estudiante-header { flex-direction: column; align-items: flex-start; gap: 8px; }
+    .estudiante-header > div:last-child { display: flex; gap: 6px; flex-wrap: wrap; }
+    .vincular-form { flex-direction: column; }
+    .vincular-form select { min-width: unset !important; width: 100%; }
+    .vincular-form label { white-space: normal; }
+    .reps-lista { gap: 6px; }
+    .grid2 { grid-template-columns: 1fr !important; }
+    input[type=text], select, input[type=email] { font-size: 16px !important; }
+    .btn-sm { padding: 8px 12px; font-size: 13px; }
+}
+@media (max-width: 380px) {
+    .estudiante-card { padding: 13px; }
+    .btn { width: 100%; text-align: center; margin-bottom: 5px; }
+}
+
 </style>
 
 <div class="container">

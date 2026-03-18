@@ -182,6 +182,17 @@ function col_to_index($col) {
 
 header_html('Importar Estudiantes');
 ?>
+
+<style>
+/* ── RESPONSIVE IMPORTAR ── */
+@media (max-width: 600px) {
+    input[type=file] { width: 100%; font-size: 14px; }
+    .btn { width: 100%; text-align: center; display: block; margin-bottom: 8px; }
+    .btn-green { width: 100%; text-align: center; }
+    p { font-size: 13px !important; }
+}
+</style>
+
 <div class="container">
     <div class="card">
         <h2>📥 Importar Estudiantes desde Excel</h2>
@@ -197,7 +208,7 @@ header_html('Importar Estudiantes');
         <form method="POST" enctype="multipart/form-data">
             <div class="form-group">
                 <label>Seleccionar archivo Excel (.xlsx)</label>
-                <input type="file" name="archivo" accept=".xlsx" required style="padding:8px">
+                <input type="file" name="archivo" accept=".xlsx" required style="padding:8px;width:100%;font-size:16px">
             </div>
             <button type="submit" class="btn">📤 Importar</button>
         </form>
