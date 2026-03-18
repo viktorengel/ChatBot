@@ -12,7 +12,7 @@ define('DB_PASS', 'Orktvi.5/*83e');
 // ============================================
 define('EVOLUTION_URL', 'https://whatsapp.ecuasys.com');
 define('EVOLUTION_KEY', 'colegio_pomasqui_2026');
-define('EVOLUTION_INSTANCE', 'colegio-pomasqui');
+define('EVOLUTION_INSTANCE', 'ChatBot');
 
 // ============================================
 // CONEXIÓN A BASE DE DATOS

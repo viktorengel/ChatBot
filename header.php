@@ -116,6 +116,9 @@ function header_html($titulo) {
         </div>
     </div>
     <?php endif; ?>
+    <div class="nav-item" style="margin-left: auto;">
+        <a href="contacto.php">📇 Contacto</a>
+    </div>
 </div>
 <?php
 }
