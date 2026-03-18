@@ -60,15 +60,59 @@ function norm_tel($telefono) {
 
 $fecha_formato = date('d/m/Y', strtotime($pendiente['fecha']));
 
+function elegir_plantilla($nombre_rep, $nombre_est, $curso, $fecha) {
+    $plantillas = [
+        // Plantilla 1 - Formal directa
+        "🏫 *Unidad Educativa Pomasqui*\n\n"
+        . "Estimado/a *{$nombre_rep}*,\n\n"
+        . "Le informamos que su representado/a:\n"
+        . "👤 *{$nombre_est}*\n"
+        . "📚 Curso: *{$curso}*\n\n"
+        . "No asistió a clases el día *{$fecha}*.\n\n"
+        . "Le solicitamos justificar esta inasistencia con su *docente tutor* a la brevedad posible.\n\n"
+        . "_Mensaje automático - U.E. Pomasqui_",
+
+        // Plantilla 2 - Cordial
+        "📢 *U.E. Pomasqui* le saluda cordialmente.\n\n"
+        . "Estimado/a representante *{$nombre_rep}*:\n\n"
+        . "Por medio del presente le notificamos que el/la estudiante\n"
+        . "✏️ *{$nombre_est}* — *{$curso}*\n\n"
+        . "registró una *ausencia* el día *{$fecha}*.\n\n"
+        . "Agradecemos justificar la inasistencia con el *docente tutor*.\n\n"
+        . "_Notificación automática - U.E. Pomasqui_",
+
+        // Plantilla 3 - Breve y directa
+        "🏫 *U.E. Pomasqui*\n\n"
+        . "Hola *{$nombre_rep}*, le comunicamos que:\n\n"
+        . "🔴 *{$nombre_est}* no asistió a clases el día *{$fecha}*.\n"
+        . "📖 Curso: *{$curso}*\n\n"
+        . "Por favor justificar la falta con el *docente tutor*.\n\n"
+        . "_Aviso automático - U.E. Pomasqui_",
+
+        // Plantilla 4 - Con detalle de seguimiento
+        "👋 *Unidad Educativa Pomasqui*\n\n"
+        . "Estimado/a *{$nombre_rep}*,\n\n"
+        . "Le informamos que el *{$fecha}* su representado/a\n"
+        . "📌 *{$nombre_est}* del curso *{$curso}*\n\n"
+        . "no asistió a la institución.\n\n"
+        . "Le pedimos comunicarse y realizar la justificación correspondiente con el *docente tutor* en la brevedad posible.\n\n"
+        . "_Sistema de asistencia - U.E. Pomasqui_",
+
+        // Plantilla 5 - Tono de seguimiento
+        "📋 *Reporte de Asistencia*\n"
+        . "*Unidad Educativa Pomasqui*\n\n"
+        . "Apreciado/a *{$nombre_rep}*:\n\n"
+        . "Le notificamos que *{$nombre_est}* (*{$curso}*)\n"
+        . "no registró asistencia el día *{$fecha}*.\n\n"
+        . "⚠️ Es importante justificar la ausencia con su *docente tutor*.\n\n"
+        . "_Mensaje automático - U.E. Pomasqui_",
+    ];
+
+    return $plantillas[array_rand($plantillas)];
+}
+
 function enviar_whatsapp($telefono, $nombre_rep, $nombre_est, $curso, $fecha_formato) {
-    $mensaje  = "\xF0\x9F\x8F\xAB *Unidad Educativa Pomasqui*\n\n";
-    $mensaje .= "Estimado/a *{$nombre_rep}*,\n\n";
-    $mensaje .= "Le informamos que su representado/a:\n";
-    $mensaje .= "\xF0\x9F\x91\xA4 *{$nombre_est}*\n";
-    $mensaje .= "\xF0\x9F\x93\x9A Curso: *{$curso}*\n\n";
-    $mensaje .= "No asisti\xC3\xB3 a clases el d\xC3\xADa *{$fecha_formato}*.\n\n";
-    $mensaje .= "Por favor com\xC3\xBAn\xC3\xADquese con la instituci\xC3\xB3n.\n\n";
-    $mensaje .= "_Mensaje autom\xC3\xA1tico - U.E. Pomasqui_";
+    $mensaje = elegir_plantilla($nombre_rep, $nombre_est, $curso, $fecha_formato);
 
     $payload = json_encode([
         "number" => $telefono,
