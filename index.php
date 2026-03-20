@@ -33,9 +33,9 @@ header_html('Registrar Falta');
 .tab-panel.activo { display: block; }
 
 /* ── PESTAÑA 1: BÚSQUEDA ── */
-.busqueda-grid { border: 1px solid #ddd; border-radius: 8px; margin-bottom: 15px; }
+.busqueda-grid { border: 1px solid #ddd; border-radius: 8px; overflow: hidden; margin-bottom: 15px; }
 .busqueda-col { padding: 15px; }
-.busqueda-col:first-child { background: #fafafa; }
+.busqueda-col:first-child { border-bottom: 1px solid #ddd; background: #fafafa; }
 .busqueda-col h4 { font-size: 13px; color: #1a73e8; font-weight: bold; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 0.5px; }
 .cascada-select { width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 6px; font-size: 13px; margin-bottom: 8px; }
 .buscador-wrap { position: relative; }
@@ -77,7 +77,7 @@ header_html('Registrar Falta');
 .switch input { opacity: 0; width: 0; height: 0; }
 .switch-slider {
     position: absolute; inset: 0;
-    background: #34a853; border-radius: 24px;
+    background: #e0e0e0; border-radius: 24px;
     transition: background 0.2s;
     cursor: pointer;
 }
@@ -128,6 +128,7 @@ header_html('Registrar Falta');
     .accion-row { flex-direction: column; align-items: stretch; }
     .accion-row .form-group { flex: unset !important; width: 100%; }
     .accion-row .btn { width: 100%; text-align: center; margin-bottom: 4px; }
+    select[multiple] { height: 110px; font-size: 16px; }
     .cascada-select, #buscador-nombre { font-size: 16px !important; }
     .r-wrap { border-radius: 6px; }
     .r-tabla { font-size: 11px; }
@@ -181,7 +182,25 @@ header_html('Registrar Falta');
                             <div class="dropdown-lista" id="lista-nombre"></div>
                         </div>
                     </div>
-
+                    <div class="busqueda-col">
+                        <h4>🗂️ Buscar por curso</h4>
+                        <div class="cascada-grid">
+                            <select class="cascada-select" id="sel-jornada" onchange="cargarNiveles()" style="margin:0">
+                                <option value="">— Jornada —</option>
+                                <?php foreach ($jornadas_arr as $j): ?>
+                                <option value="<?= htmlspecialchars($j['nombre']) ?>"><?= htmlspecialchars($j['nombre']) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                            <select class="cascada-select" id="sel-nivel" onchange="cargarCursos()" disabled style="margin:0">
+                                <option value="">— Nivel —</option>
+                            </select>
+                            <select class="cascada-select" id="sel-curso" onchange="cargarEstudiantesCurso()" disabled style="margin:0">
+                                <option value="">— Curso —</option>
+                            </select>
+                        </div>
+                        <select class="cascada-select" id="sel-estudiantes-curso" multiple style="height:90px;margin:0" onchange="agregarDesdeCascada()"></select>
+                        <small style="color:#777;font-size:11px">Ctrl+clic o toca para seleccionar varios</small>
+                    </div>
                 </div>
             </div>
 
@@ -254,9 +273,9 @@ header_html('Registrar Falta');
         </div>
         <div id="tabla-faltas">
         <?php
-        $es_admin = esAdmin();
-        $trash    = "<svg xmlns='http://www.w3.org/2000/svg' width='13' height='13' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='3 6 5 6 21 6'/><path d='M19 6l-1 14H6L5 6'/><path d='M10 11v6'/><path d='M14 11v6'/><path d='M9 6V4h6v2'/></svg>";
-        $cols     = 2;
+        $es_admin     = esAdmin();
+        $trash        = "<svg xmlns='http://www.w3.org/2000/svg' width='13' height='13' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='3 6 5 6 21 6'/><path d='M19 6l-1 14H6L5 6'/><path d='M10 11v6'/><path d='M14 11v6'/><path d='M9 6V4h6v2'/></svg>";
+        $cols         = 2;
         $fecha_filtro = $hoy;
 
         if ($es_admin) {
@@ -285,10 +304,10 @@ header_html('Registrar Falta');
         if (empty($filas)) {
             echo "<p style='text-align:center;color:#aaa;padding:20px 0'>No hay faltas registradas para esta fecha</p>";
         } else {
-            $th_acc  = $es_admin ? "WhatsApp&nbsp;&nbsp;Eliminar" : "WhatsApp";
+            $th_acc    = $es_admin ? "WhatsApp&nbsp;&nbsp;Eliminar" : "WhatsApp";
+            $curso_act = null;
             echo "<div class='r-wrap'><table class='r-tabla'><tbody>"
                . "<tr class='r-fila-header'><td>Estudiante</td><td class='r-th-acc'>$th_acc</td></tr>";
-            $curso_act = null;
             foreach ($filas as $f) {
                 $curso_str = $f['curso'] ?? '—';
                 if ($curso_str !== $curso_act) {
@@ -329,6 +348,58 @@ function cambiarTab(tab) {
     document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('activo'));
     document.getElementById('tab-' + tab).classList.add('activo');
     event.currentTarget.classList.add('activo');
+}
+
+// ══════════════════════════════════════
+// PESTAÑA 1 — CASCADA (búsqueda individual)
+// ══════════════════════════════════════
+function cargarNiveles() {
+    var jornada = document.getElementById('sel-jornada').value;
+    var sel = document.getElementById('sel-nivel');
+    sel.innerHTML = '<option value="">— Nivel —</option>';
+    sel.disabled = !jornada;
+    document.getElementById('sel-curso').innerHTML = '<option value="">— Curso —</option>';
+    document.getElementById('sel-curso').disabled = true;
+    document.getElementById('sel-estudiantes-curso').innerHTML = '';
+    if (!jornada) return;
+    fetch('cascada_ajax.php?accion=niveles&jornada=' + encodeURIComponent(jornada))
+        .then(r => r.json())
+        .then(niveles => {
+            niveles.forEach(n => sel.innerHTML += '<option value="' + n + '">' + n + '</option>');
+            sel.disabled = false;
+        });
+}
+function cargarCursos() {
+    var jornada = document.getElementById('sel-jornada').value;
+    var nivel   = document.getElementById('sel-nivel').value;
+    var sel     = document.getElementById('sel-curso');
+    sel.innerHTML = '<option value="">— Curso —</option>';
+    sel.disabled  = !nivel;
+    document.getElementById('sel-estudiantes-curso').innerHTML = '';
+    if (!nivel) return;
+    fetch('cascada_ajax.php?accion=cursos&jornada=' + encodeURIComponent(jornada) + '&nivel=' + encodeURIComponent(nivel))
+        .then(r => r.json())
+        .then(cursos => {
+            cursos.forEach(c => sel.innerHTML += '<option value="' + c.id + '">' + c.nombre + '</option>');
+            sel.disabled = false;
+        });
+}
+function cargarEstudiantesCurso() {
+    var curso_id = document.getElementById('sel-curso').value;
+    var sel      = document.getElementById('sel-estudiantes-curso');
+    sel.innerHTML = '';
+    if (!curso_id) return;
+    var disponibles = todosEstudiantes.filter(e => e.curso_id == curso_id && !seleccionados[e.id]);
+    if (disponibles.length === 0) { sel.innerHTML = '<option disabled>Sin estudiantes disponibles</option>'; return; }
+    disponibles.forEach(e => {
+        sel.innerHTML += '<option value="' + e.id + '" data-nombre="' + e.nombre + '" data-curso="' + e.curso + '">' + e.nombre + '</option>';
+    });
+}
+function agregarDesdeCascada() {
+    var sel = document.getElementById('sel-estudiantes-curso');
+    Array.from(sel.selectedOptions).forEach(opt => agregarEstudiante(opt.value, opt.getAttribute('data-nombre'), opt.getAttribute('data-curso')));
+    Array.from(sel.options).forEach(o => o.selected = false);
+    cargarEstudiantesCurso();
 }
 
 // ══════════════════════════════════════
@@ -420,13 +491,12 @@ function listaCargarEstudiantes() {
                + '</div>';
 
     var filas = estudiantes.map(function(e) {
-        var eid       = parseInt(e.id, 10);
-        var marcado   = seleccionados[eid] ? 'checked' : '';
-        var cls_nombre = seleccionados[eid] ? 'switch-nombre ausente' : 'switch-nombre';
-        return '<div class="switch-row" id="sw-row-' + eid + '">'
-             + '<span class="' + cls_nombre + '" id="sw-label-' + eid + '">' + e.nombre + '</span>'
+        var marcado   = seleccionados[e.id] ? 'checked' : '';
+        var cls_nombre = seleccionados[e.id] ? 'switch-nombre ausente' : 'switch-nombre';
+        return '<div class="switch-row" id="sw-row-' + e.id + '">'
+             + '<span class="' + cls_nombre + '" id="sw-label-' + e.id + '">' + e.nombre + '</span>'
              + '<label class="switch">'
-             + '<input type="checkbox" ' + marcado + ' onchange="toggleAusente(' + eid + ')">'
+             + '<input type="checkbox" ' + marcado + ' onchange="toggleAusente(' + e.id + ', \'' + e.nombre.replace(/'/g, "\\'") + '\', \'' + (e.curso || '').replace(/'/g, "\\'") + '\')">'
              + '<span class="switch-slider"></span>'
              + '</label>'
              + '</div>';
@@ -435,19 +505,14 @@ function listaCargarEstudiantes() {
     contenido.innerHTML = header + filas;
 }
 
-function toggleAusente(id) {
-    id = parseInt(id, 10);
-    // Buscar datos desde el array global (evita problemas de escapado con tildes/ñ)
-    var est = todosEstudiantes.find(function(e) { return parseInt(e.id, 10) === id; });
-    var nombre = est ? est.nombre : '';
-    var curso  = est ? (est.curso || '') : '';
-
+function toggleAusente(id, nombre, curso) {
     if (seleccionados[id]) {
         // Quitar ausente
         quitarEstudiante(id);
+        var row   = document.getElementById('sw-row-'   + id);
         var label = document.getElementById('sw-label-' + id);
-        if (label) label.className = 'switch-nombre';
-        var row = document.getElementById('sw-row-' + id);
+        if (label) { label.className = 'switch-nombre'; }
+        // desmarcar el switch si aún existe
         var chk = row ? row.querySelector('input[type=checkbox]') : null;
         if (chk) chk.checked = false;
     } else {
@@ -462,11 +527,9 @@ function toggleAusente(id) {
 // SELECCIONADOS (compartido)
 // ══════════════════════════════════════
 function agregarEstudiante(id, nombre, curso) {
-    id = parseInt(id, 10);
     if (seleccionados[id]) return;
     seleccionados[id] = { nombre: nombre, curso: curso };
-    var sinSel = document.getElementById('sin-seleccionados');
-    if (sinSel) sinSel.style.display = 'none';
+    document.getElementById('sin-seleccionados').style.display = 'none';
     var tag = document.createElement('div');
     tag.className = 'sel-tag'; tag.id = 'tag-' + id;
     tag.innerHTML = nombre + ' <button type="button" class="quitar" onclick="quitarEstudiante(' + id + ')">✕</button>';
@@ -477,21 +540,9 @@ function agregarEstudiante(id, nombre, curso) {
     actualizarContador();
 }
 function quitarEstudiante(id) {
-    id = parseInt(id, 10);
     delete seleccionados[id];
     var t = document.getElementById('tag-' + id); if (t) t.remove();
     var h = document.getElementById('hi-'  + id); if (h) h.remove();
-    if (Object.keys(seleccionados).length === 0) {
-        var tags = document.getElementById('seleccionados-tags');
-        if (!document.getElementById('sin-seleccionados')) {
-            var sp = document.createElement('span');
-            sp.className = 'sin-seleccionados'; sp.id = 'sin-seleccionados';
-            sp.textContent = 'Ningún estudiante seleccionado aún';
-            tags.appendChild(sp);
-        } else {
-            document.getElementById('sin-seleccionados').style.display = 'inline';
-        }
-    }
     // Actualizar switch en pestaña 2 si está visible
     var label = document.getElementById('sw-label-' + id);
     if (label) { label.className = 'switch-nombre'; }
@@ -499,6 +550,7 @@ function quitarEstudiante(id) {
     var chk = row ? row.querySelector('input[type=checkbox]') : null;
     if (chk) chk.checked = false;
     actualizarContador();
+    cargarEstudiantesCurso(); // refresca la lista de cascada tab1
 }
 function actualizarContador() {
     var total = Object.keys(seleccionados).length;
@@ -506,8 +558,7 @@ function actualizarContador() {
     var btn = document.getElementById('btn-registrar');
     btn.disabled      = total === 0;
     btn.style.opacity = total > 0 ? '1' : '0.5';
-    var sinSel = document.getElementById('sin-seleccionados');
-    if (sinSel) sinSel.style.display = total === 0 ? 'inline' : 'none';
+    document.getElementById('sin-seleccionados').style.display = total === 0 ? 'inline' : 'none';
 }
 function limpiarTodo() {
     seleccionados = {};
@@ -516,6 +567,12 @@ function limpiarTodo() {
     // Pestaña 1
     document.getElementById('buscador-nombre').value = '';
     document.getElementById('lista-nombre').style.display = 'none';
+    document.getElementById('sel-jornada').value = '';
+    document.getElementById('sel-nivel').innerHTML = '<option value="">— Nivel —</option>';
+    document.getElementById('sel-nivel').disabled = true;
+    document.getElementById('sel-curso').innerHTML = '<option value="">— Curso —</option>';
+    document.getElementById('sel-curso').disabled = true;
+    document.getElementById('sel-estudiantes-curso').innerHTML = '';
     // Pestaña 2: recargar lista para desmarcar switches
     listaCargarEstudiantes();
     actualizarContador();
@@ -527,15 +584,13 @@ var fechaConsultaTabla = '<?= $hoy ?>';
 function cambiarFechaTabla(fecha) {
     fechaConsultaTabla = fecha;
     document.getElementById('filtro-fecha-tabla').value = fecha;
-    // Actualizar título
     var partes = fecha.split('-');
-    var d = new Date(partes[0], partes[1]-1, partes[2]);
+    var d    = new Date(partes[0], partes[1]-1, partes[2]);
     var dias = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
     var fmt  = partes[2]+'/'+partes[1]+'/'+partes[0];
     document.getElementById('titulo-fecha').textContent = dias[d.getDay()] + ', ' + fmt;
     refrescarTabla();
 }
-
 function refrescarTabla() {
     fetch('faltas_ajax.php?fecha=' + encodeURIComponent(fechaConsultaTabla))
         .then(r => r.json())
@@ -543,7 +598,6 @@ function refrescarTabla() {
         .catch(() => {});
 }
 setInterval(function(){
-    // Solo auto-refresca si estamos viendo hoy
     if (fechaConsultaTabla === '<?= $hoy ?>') refrescarTabla();
 }, 60000);
 </script>

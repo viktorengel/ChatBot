@@ -4,6 +4,9 @@ require_once 'config.php';
 date_default_timezone_set('America/Guayaquil');
 $conn = conectar();
 
+// ── URL del servidor HTTP interno de Baileys ──
+define('BAILEYS_URL', 'https://whatsapp.ecuasys.com/send');
+
 $pendiente = $conn->query("
     SELECT f.id, f.fecha, e.nombre as estudiante, c.nombre as curso, f.estudiante_id
     FROM faltas f
@@ -16,7 +19,7 @@ $pendiente = $conn->query("
 
 if (!$pendiente) exit;
 
-// Verificar si ya se envio hoy
+// Verificar si ya se envió hoy para este estudiante
 $ya_enviado = $conn->query("
     SELECT id FROM faltas
     WHERE estudiante_id = {$pendiente['estudiante_id']}
@@ -31,7 +34,7 @@ if ($ya_enviado) {
     exit;
 }
 
-// Obtener todos los representantes del estudiante
+// Obtener representantes del estudiante
 $representantes = $conn->query("
     SELECT r.nombre, r.telefono
     FROM representantes r
@@ -39,7 +42,6 @@ $representantes = $conn->query("
     WHERE er.estudiante_id = {$pendiente['estudiante_id']}
     ORDER BY er.es_principal DESC
 ");
-
 $reps = [];
 while ($r = $representantes->fetch_assoc()) $reps[] = $r;
 
@@ -49,20 +51,18 @@ if (empty($reps)) {
     exit;
 }
 
-// Normalizar telefono
+// Normalizar teléfono al formato Baileys
 function norm_tel($telefono) {
     $tel = preg_replace('/\D/', '', $telefono);
     if (substr($tel, 0, 3) !== '593') {
         $tel = substr($tel, 0, 1) === '0' ? '593' . substr($tel, 1) : '593' . $tel;
     }
-    return $tel;
+    return $tel . '@s.whatsapp.net';
 }
 
-$fecha_formato = date('d/m/Y', strtotime($pendiente['fecha']));
-
+// 5 plantillas rotativas (igual que antes)
 function elegir_plantilla($nombre_rep, $nombre_est, $curso, $fecha) {
     $plantillas = [
-        // Plantilla 1 - Formal directa
         "🏫 *Unidad Educativa Pomasqui*\n\n"
         . "Estimado/a *{$nombre_rep}*,\n\n"
         . "Le informamos que su representado/a:\n"
@@ -72,7 +72,6 @@ function elegir_plantilla($nombre_rep, $nombre_est, $curso, $fecha) {
         . "Le solicitamos justificar esta inasistencia con su *docente tutor* a la brevedad posible.\n\n"
         . "_Mensaje automático - U.E. Pomasqui_",
 
-        // Plantilla 2 - Cordial
         "📢 *U.E. Pomasqui* le saluda cordialmente.\n\n"
         . "Estimado/a representante *{$nombre_rep}*:\n\n"
         . "Por medio del presente le notificamos que el/la estudiante\n"
@@ -81,7 +80,6 @@ function elegir_plantilla($nombre_rep, $nombre_est, $curso, $fecha) {
         . "Agradecemos justificar la inasistencia con el *docente tutor*.\n\n"
         . "_Notificación automática - U.E. Pomasqui_",
 
-        // Plantilla 3 - Breve y directa
         "🏫 *U.E. Pomasqui*\n\n"
         . "Hola *{$nombre_rep}*, le comunicamos que:\n\n"
         . "🔴 *{$nombre_est}* no asistió a clases el día *{$fecha}*.\n"
@@ -89,7 +87,6 @@ function elegir_plantilla($nombre_rep, $nombre_est, $curso, $fecha) {
         . "Por favor justificar la falta con el *docente tutor*.\n\n"
         . "_Aviso automático - U.E. Pomasqui_",
 
-        // Plantilla 4 - Con detalle de seguimiento
         "👋 *Unidad Educativa Pomasqui*\n\n"
         . "Estimado/a *{$nombre_rep}*,\n\n"
         . "Le informamos que el *{$fecha}* su representado/a\n"
@@ -98,7 +95,6 @@ function elegir_plantilla($nombre_rep, $nombre_est, $curso, $fecha) {
         . "Le pedimos comunicarse y realizar la justificación correspondiente con el *docente tutor* en la brevedad posible.\n\n"
         . "_Sistema de asistencia - U.E. Pomasqui_",
 
-        // Plantilla 5 - Tono de seguimiento
         "📋 *Reporte de Asistencia*\n"
         . "*Unidad Educativa Pomasqui*\n\n"
         . "Apreciado/a *{$nombre_rep}*:\n\n"
@@ -107,58 +103,50 @@ function elegir_plantilla($nombre_rep, $nombre_est, $curso, $fecha) {
         . "⚠️ Es importante justificar la ausencia con su *docente tutor*.\n\n"
         . "_Mensaje automático - U.E. Pomasqui_",
     ];
-
     return $plantillas[array_rand($plantillas)];
 }
 
-function enviar_whatsapp($telefono, $nombre_rep, $nombre_est, $curso, $fecha_formato) {
-    $mensaje = elegir_plantilla($nombre_rep, $nombre_est, $curso, $fecha_formato);
-
-    $payload = json_encode([
-        "number" => $telefono,
-        "options" => ["delay" => 1000, "presence" => "composing"],
-        "textMessage" => ["text" => $mensaje]
-    ]);
-
+// Enviar a través de Baileys (HTTP interno puerto 3001)
+function enviar_whatsapp_baileys($numero, $texto) {
+    $payload = json_encode(['number' => $numero, 'text' => $texto]);
     $context = stream_context_create([
         'http' => [
-            'method' => 'POST',
-            'header' => "Content-Type: application/json\r\napikey: " . EVOLUTION_KEY . "\r\n",
-            'content' => $payload,
-            'timeout' => 15,
-            'ignore_errors' => true
-        ],
-        'ssl' => ['verify_peer' => false, 'verify_peer_name' => false]
+            'method'        => 'POST',
+            'header'        => "Content-Type: application/json\r\napikey: " . EVOLUTION_KEY . "\r\n",
+            'content'       => $payload,
+            'timeout'       => 15,
+            'ignore_errors' => true,
+        ]
     ]);
-
-    return file_get_contents(
-        EVOLUTION_URL . "/message/sendText/" . EVOLUTION_INSTANCE,
-        false,
-        $context
-    );
+    $resp = file_get_contents(BAILEYS_URL, false, $context);
+    if ($resp === false) return false;
+    $json = json_decode($resp, true);
+    return isset($json['status']) && $json['status'] === 'sent';
 }
 
-// Enviar a todos los representantes
-$enviado = false;
+$fecha_fmt = date('d/m/Y', strtotime($pendiente['fecha']));
+$enviado   = false;
+
 foreach ($reps as $i => $rep) {
     if ($i > 0) sleep(rand(3, 6));
 
-    $tel = norm_tel($rep['telefono']) . "@s.whatsapp.net";
-    $response = enviar_whatsapp(
-        $tel,
+    $numero  = norm_tel($rep['telefono']);
+    $mensaje = elegir_plantilla(
         $rep['nombre'],
         $pendiente['estudiante'],
         $pendiente['curso'] ?? 'Sin curso',
-        $fecha_formato
+        $fecha_fmt
     );
 
-    if ($response !== false) {
-        $enviado = true;
-        file_put_contents('/home/ecuasysc/as.ecuasys.com/cron_log.txt',
-            date('Y-m-d H:i:s') . " - Enviado a {$rep['nombre']} ({$tel})\n",
-            FILE_APPEND
-        );
-    }
+    $ok = enviar_whatsapp_baileys($numero, $mensaje);
+
+    file_put_contents(
+        '/home/ecuasysc/as.ecuasys.com/cron_log.txt',
+        date('Y-m-d H:i:s') . ' - ' . ($ok ? '✅' : '❌') . " {$rep['nombre']} ({$numero})\n",
+        FILE_APPEND
+    );
+
+    if ($ok) $enviado = true;
 }
 
 if ($enviado) {
@@ -166,4 +154,3 @@ if ($enviado) {
 }
 
 $conn->close();
-?>
