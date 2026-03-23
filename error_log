@@ -30,3 +30,49 @@ Stack trace:
   thrown in /home/ecuasysc/as.ecuasys.com/representantes.php on line 18
 [18-Mar-2026 02:56:09 UTC] PHP Parse error:  syntax error, unexpected token "<", expecting end of file in /home/ecuasysc/as.ecuasys.com/index.php on line 209
 [18-Mar-2026 03:20:42 UTC] PHP Parse error:  syntax error, unexpected identifier "http" in /home/ecuasysc/as.ecuasys.com/reportes.php on line 196
+[21-Mar-2026 14:52:27 UTC] PHP Fatal error:  Uncaught mysqli_sql_exception: Table 'ecuasysc_asistencias.bot_institucion' doesn't exist in /home/ecuasysc/as.ecuasys.com/chatbot.php:154
+Stack trace:
+#0 /home/ecuasysc/as.ecuasys.com/chatbot.php(154): mysqli->query()
+#1 {main}
+  thrown in /home/ecuasysc/as.ecuasys.com/chatbot.php on line 154
+[21-Mar-2026 14:56:15 UTC] PHP Fatal error:  Uncaught mysqli_sql_exception: Unknown column 'palabras' in 'field list' in /home/ecuasysc/as.ecuasys.com/chatbot.php:28
+Stack trace:
+#0 /home/ecuasysc/as.ecuasys.com/chatbot.php(28): mysqli->query()
+#1 {main}
+  thrown in /home/ecuasysc/as.ecuasys.com/chatbot.php on line 28
+[21-Mar-2026 14:57:09 UTC] PHP Fatal error:  Uncaught mysqli_sql_exception: Unknown column 'palabras' in 'field list' in /home/ecuasysc/as.ecuasys.com/chatbot.php:33
+Stack trace:
+#0 /home/ecuasysc/as.ecuasys.com/chatbot.php(33): mysqli->query()
+#1 {main}
+  thrown in /home/ecuasysc/as.ecuasys.com/chatbot.php on line 33
+[23-Mar-2026 08:47:32 UTC] PHP Fatal error:  Uncaught mysqli_sql_exception: Incorrect string value: '\xF0\x9F\x91\x95 U...' for column `ecuasysc_asistencias`.`bot_faq`.`caption` at row 2 in /home/ecuasysc/as.ecuasys.com/chatbot.php:127
+Stack trace:
+#0 /home/ecuasysc/as.ecuasys.com/chatbot.php(127): mysqli->query()
+#1 {main}
+  thrown in /home/ecuasysc/as.ecuasys.com/chatbot.php on line 127
+[23-Mar-2026 08:50:41 UTC] PHP Fatal error:  Uncaught mysqli_sql_exception: Incorrect string value: '\xF0\x9F\x91\x95 U...' for column `ecuasysc_asistencias`.`bot_faq`.`caption` at row 2 in /home/ecuasysc/as.ecuasys.com/chatbot.php:133
+Stack trace:
+#0 /home/ecuasysc/as.ecuasys.com/chatbot.php(133): mysqli->query()
+#1 {main}
+  thrown in /home/ecuasysc/as.ecuasys.com/chatbot.php on line 133
+[23-Mar-2026 08:51:27 UTC] PHP Fatal error:  Uncaught mysqli_sql_exception: Incorrect string value: '\xF0\x9F\x91\x95 U...' for column `ecuasysc_asistencias`.`bot_faq`.`caption` at row 2 in /home/ecuasysc/as.ecuasys.com/chatbot.php:133
+Stack trace:
+#0 /home/ecuasysc/as.ecuasys.com/chatbot.php(133): mysqli->query()
+#1 {main}
+  thrown in /home/ecuasysc/as.ecuasys.com/chatbot.php on line 133
+[23-Mar-2026 08:51:45 UTC] PHP Fatal error:  Uncaught mysqli_sql_exception: Incorrect string value: '\xF0\x9F\x91\x95 U...' for column `ecuasysc_asistencias`.`bot_faq`.`caption` at row 2 in /home/ecuasysc/as.ecuasys.com/chatbot.php:133
+Stack trace:
+#0 /home/ecuasysc/as.ecuasys.com/chatbot.php(133): mysqli->query()
+#1 {main}
+  thrown in /home/ecuasysc/as.ecuasys.com/chatbot.php on line 133
+[23-Mar-2026 08:52:38 UTC] PHP Fatal error:  Uncaught mysqli_sql_exception: Incorrect string value: '\xF0\x9F\x91\x95 U...' for column `ecuasysc_asistencias`.`bot_faq`.`caption` at row 2 in /home/ecuasysc/as.ecuasys.com/chatbot.php:133
+Stack trace:
+#0 /home/ecuasysc/as.ecuasys.com/chatbot.php(133): mysqli->query()
+#1 {main}
+  thrown in /home/ecuasysc/as.ecuasys.com/chatbot.php on line 133
+[23-Mar-2026 08:52:39 UTC] PHP Fatal error:  Uncaught mysqli_sql_exception: Incorrect string value: '\xF0\x9F\x91\x95 U...' for column `ecuasysc_asistencias`.`bot_faq`.`caption` at row 2 in /home/ecuasysc/as.ecuasys.com/chatbot.php:133
+Stack trace:
+#0 /home/ecuasysc/as.ecuasys.com/chatbot.php(133): mysqli->query()
+#1 {main}
+  thrown in /home/ecuasysc/as.ecuasys.com/chatbot.php on line 133
+[23-Mar-2026 08:58:44 UTC] PHP Parse error:  syntax error, unexpected token "\", expecting end of file in /home/ecuasysc/as.ecuasys.com/chatbot.php on line 377
