@@ -3,8 +3,13 @@ require_once 'auth.php';
 require_once 'config.php';
 
 $conn = conectar();
-$hoy = $_GET['hoy'] ?? date('Y-m-d');
+$hoy      = date('Y-m-d');
+$fecha    = $_GET['fecha'] ?? $_GET['hoy'] ?? $hoy;
+// Validar formato fecha
+if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $fecha)) $fecha = $hoy;
+// Docente solo puede consultar hoy o ayer laborable
 $es_admin = esAdmin();
+if (!$es_admin) $fecha = $hoy;
 
 if ($es_admin) {
     $query = "
@@ -12,7 +17,7 @@ if ($es_admin) {
         FROM estudiantes e
         JOIN cursos c ON e.curso_id = c.id
         JOIN estudiante_representante er ON er.estudiante_id = e.id
-        WHERE e.id NOT IN (SELECT estudiante_id FROM faltas WHERE fecha = '$hoy')
+        WHERE e.id NOT IN (SELECT estudiante_id FROM faltas WHERE fecha = '$fecha')
         ORDER BY c.nombre, e.nombre
     ";
 } else {
@@ -24,7 +29,7 @@ if ($es_admin) {
         JOIN estudiante_representante er ON er.estudiante_id = e.id
         JOIN docente_cursos dc ON dc.curso_id = c.id
         WHERE dc.docente_id = $did
-        AND e.id NOT IN (SELECT estudiante_id FROM faltas WHERE fecha = '$hoy')
+        AND e.id NOT IN (SELECT estudiante_id FROM faltas WHERE fecha = '$fecha')
         ORDER BY c.nombre, e.nombre
     ";
 }

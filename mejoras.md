@@ -7,3 +7,5 @@ Manejo de errores:
 Hay un manejo básico de errores, pero podrías mejorar la parte de logs para poder diagnosticar fácilmente problemas en producción.
 Notificaciones push:
 Podrías agregar la posibilidad de enviar notificaciones push para alertar a los padres sobre faltas o eventos importantes.
+
+el dia de hoy tome lista y envio el mensaje por whatsapp perfectamente pero quiero refistrar la falta del mismo estudiante pero en el dia anterior y me permite, en el buscador ni siquiera aparece el nombre del estudiante, en algun momento puse una validacion que si el estudiantes ya se registro que no vuelva aparecer en la busqueda y parece que esta dando problemas este momento, lo que necesito es registrar la falta del mismo estudiante pero del dia de ayer 23/03/2026, si necesitas que te envie algun otro archivo solicitame
