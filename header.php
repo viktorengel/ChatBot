@@ -328,12 +328,13 @@ function nav_activo($archivo) {
             <div class="dropdown">
                 <a href="configuracion.php">🏫 Institución y Cursos</a>
                 <a href="importar.php">📥 Importar Excel</a>
+                <a href="chatbot.php">🤖 ChatBot</a>
                 <a href="https://whatsapp.ecuasys.com/manager" target="_blank">📱 Conectar WhatsApp</a>
             </div>
         </div>
         <?php endif; ?>
         <div class="nav-item nav-right <?= nav_activo('contacto.php') ?>">
-            <a href="contacto.php" target="_blank">📇 Contacto</a>
+            <a href="contacto.php">📇 Contacto</a>
         </div>
     </nav>
 
@@ -366,6 +367,7 @@ function nav_activo($archivo) {
         <div class="drawer-seccion-titulo">Configuración</div>
         <a href="configuracion.php"  class="drawer-sub-link <?= nav_activo('configuracion.php') ?>">🏫 Institución y Cursos</a>
         <a href="importar.php"       class="drawer-sub-link <?= nav_activo('importar.php') ?>">📥 Importar Excel</a>
+        <a href="chatbot.php"        class="drawer-sub-link <?= nav_activo('chatbot.php') ?>">🤖 ChatBot</a>
         <a href="https://whatsapp.ecuasys.com/manager" target="_blank" class="drawer-sub-link">📱 Conectar WhatsApp</a>
         <?php endif; ?>
 

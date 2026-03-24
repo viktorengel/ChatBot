@@ -12,20 +12,27 @@ $conn = conectar();
 $msg = '';
 $err = '';
 
+// Crear columna cedula si no existe
+$conn->query("ALTER TABLE estudiantes ADD COLUMN IF NOT EXISTS cedula VARCHAR(13) DEFAULT NULL");
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['accion'])) {
     if ($_POST['accion'] === 'agregar') {
         $nombre = trim($_POST['nombre']);
+        $cedula = trim($_POST['cedula'] ?? '');
+        $cedula = $cedula ?: null;
         $curso_id = !empty($_POST['curso_id']) ? intval($_POST['curso_id']) : null;
-        $stmt = $conn->prepare("INSERT INTO estudiantes (nombre, curso_id) VALUES (?, ?)");
-        $stmt->bind_param("si", $nombre, $curso_id);
+        $stmt = $conn->prepare("INSERT INTO estudiantes (nombre, cedula, curso_id) VALUES (?, ?, ?)");
+        $stmt->bind_param("ssi", $nombre, $cedula, $curso_id);
         $msg = $stmt->execute() ? "Estudiante registrado correctamente" : "Error: " . $conn->error;
 
     } elseif ($_POST['accion'] === 'editar') {
         $id = intval($_POST['id']);
         $nombre = trim($_POST['nombre']);
+        $cedula = trim($_POST['cedula'] ?? '');
+        $cedula = $cedula ?: null;
         $curso_id = !empty($_POST['curso_id']) ? intval($_POST['curso_id']) : null;
-        $stmt = $conn->prepare("UPDATE estudiantes SET nombre=?, curso_id=? WHERE id=?");
-        $stmt->bind_param("sii", $nombre, $curso_id, $id);
+        $stmt = $conn->prepare("UPDATE estudiantes SET nombre=?, cedula=?, curso_id=? WHERE id=?");
+        $stmt->bind_param("ssii", $nombre, $cedula, $curso_id, $id);
         $msg = $stmt->execute() ? "Estudiante actualizado" : "Error: " . $conn->error;
 
     } elseif ($_POST['accion'] === 'eliminar') {
@@ -103,23 +110,6 @@ header_html('Estudiantes');
 .vincular-form label { font-weight: normal; font-size: 13px; display: flex; align-items: center; gap: 4px; white-space: nowrap; }
 .grupo-curso { margin-bottom: 20px; }
 .grupo-curso-titulo { background: #1557b0; color: white; padding: 8px 15px; border-radius: 8px; font-size: 14px; font-weight: bold; margin-bottom: 10px; }
-/* ── RESPONSIVE ── */
-@media (max-width: 600px) {
-    .estudiante-header { flex-direction: column; align-items: flex-start; gap: 8px; }
-    .estudiante-header > div:last-child { display: flex; gap: 6px; flex-wrap: wrap; }
-    .vincular-form { flex-direction: column; }
-    .vincular-form select { min-width: unset !important; width: 100%; }
-    .vincular-form label { white-space: normal; }
-    .reps-lista { gap: 6px; }
-    .grid2 { grid-template-columns: 1fr !important; }
-    input[type=text], select, input[type=email] { font-size: 16px !important; }
-    .btn-sm { padding: 8px 12px; font-size: 13px; }
-}
-@media (max-width: 380px) {
-    .estudiante-card { padding: 13px; }
-    .btn { width: 100%; text-align: center; margin-bottom: 5px; }
-}
-
 </style>
 
 <div class="container">
@@ -135,6 +125,10 @@ header_html('Estudiantes');
                 <div class="form-group">
                     <label>Nombre completo</label>
                     <input type="text" name="nombre" placeholder="Apellido Nombre" value="<?= htmlspecialchars($editar['nombre'] ?? '') ?>" required>
+                </div>
+                <div class="form-group">
+                    <label>Cédula <small style="font-weight:normal;color:#999">(opcional)</small></label>
+                    <input type="text" name="cedula" placeholder="0123456789" maxlength="13" value="<?= htmlspecialchars($editar['cedula'] ?? '') ?>">
                 </div>
                 <div class="form-group">
                     <label>Curso</label>
@@ -198,7 +192,13 @@ header_html('Estudiantes');
                 <div class="estudiante-header">
                     <div class="estudiante-info">
                         <h3><?= htmlspecialchars($e['nombre']) ?></h3>
-                        <p><?= htmlspecialchars($e['curso_nombre'] ?? 'Sin curso') ?></p>
+                        <p><?= htmlspecialchars($e['curso_nombre'] ?? 'Sin curso') ?>
+                        <?php if (!empty($e['cedula'])): ?>
+                            &nbsp;·&nbsp; <span style="color:#1a73e8;font-size:12px">🪪 <?= htmlspecialchars($e['cedula']) ?></span>
+                        <?php else: ?>
+                            &nbsp;·&nbsp; <span style="color:#f29900;font-size:12px">⚠️ Sin cédula</span>
+                        <?php endif; ?>
+                        </p>
                     </div>
                     <div style="display:flex;gap:6px">
                         <a href="estudiantes.php?editar=<?= $e['id'] ?>" class="btn btn-green btn-sm" style="text-decoration:none">✏️</a>

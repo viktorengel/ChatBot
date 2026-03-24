@@ -2,7 +2,7 @@
 // ============================================
 // CONFIGURACIÓN BASE DE DATOS
 // ============================================
-define('DB_HOST', 'localhost');
+define('DB_HOST', 'paul.hostservercloud.com');
 define('DB_NAME', 'ecuasysc_asistencias');
 define('DB_USER', 'ecuasysc_user');
 define('DB_PASS', 'Orktvi.5/*83e');
@@ -22,7 +22,7 @@ function conectar() {
     if ($conn->connect_error) {
         die("Error de conexión: " . $conn->connect_error);
     }
-    $conn->set_charset("utf8");
+    $conn->set_charset("utf8mb4");
     return $conn;
 }
 
