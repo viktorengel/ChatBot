@@ -337,6 +337,22 @@ header_html('Registrar Falta');
 
 
 
+            <!-- FECHA (siempre primero) -->
+            <div style="padding:12px 15px;border-bottom:1px solid #e8eaed;background:#f8f9fa;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+                <div class="form-group" style="margin:0;flex:0 0 220px">
+                    <label style="font-size:12px;color:#555;font-weight:600;display:block;margin-bottom:4px">
+                        📅 Fecha de la falta
+                        <?php if (esAdmin()): ?><small style="color:#1a73e8;font-weight:normal"> (admin: cualquier fecha)</small><?php endif; ?>
+                    </label>
+                    <input type="date" id="fecha-registro" name="fecha" value="<?= $hoy ?>"
+                        <?php if (!esAdmin()): ?>min="<?= $ayer ?>"<?php endif; ?>
+                        max="<?= $hoy ?>" required
+                        onchange="recargarEstudiantes(this.value)"
+                        style="padding:8px;border:1px solid #ddd;border-radius:6px;font-size:14px;font-weight:600;color:#1a73e8">
+                </div>
+                <div style="font-size:12px;color:#999;padding-top:18px">← Selecciona primero la fecha, luego busca el estudiante</div>
+            </div>
+
             <!-- PESTAÑAS -->
 
             <div class="tabs-nav">
@@ -477,32 +493,14 @@ header_html('Registrar Falta');
 
 
 
-            <!-- FECHA Y BOTÓN -->
-
+            <!-- BOTONES -->
             <div class="accion-row">
-
-                <div class="form-group">
-
-                     <label>Fecha<?php if (esAdmin()): ?> <small style="color:#1a73e8;font-weight:normal">(admin: cualquier fecha)</small><?php endif; ?></label>
-                    <input type="date" id="fecha-registro" name="fecha" value="<?= $hoy ?>"
-                        <?php if (!esAdmin()): ?>min="<?= $ayer ?>"<?php endif; ?>
-                        max="<?= $hoy ?>" required
-                        onchange="recargarEstudiantes(this.value)">
-
-                </div>
-
                 <button type="submit" class="btn" id="btn-registrar" disabled style="opacity:0.5;margin-bottom:0">
-
                     📤 Registrar Faltas
-
                 </button>
-
                 <button type="button" class="btn" style="background:#777;margin-bottom:0" onclick="limpiarTodo()">
-
                     🗑 Limpiar
-
                 </button>
-
             </div>
 
         </form>
@@ -844,49 +842,39 @@ function agregarDesdeCascada() {
 // ══════════════════════════════════════
 
 function buscarPorNombre() {
-
     var q     = document.getElementById('buscador-nombre').value.toLowerCase().trim();
-
     var lista = document.getElementById('lista-nombre');
-
     lista.innerHTML = '';
-
     if (q.length < 1) { lista.style.display = 'none'; return; }
-
-    var filtrados = todosEstudiantes.filter(e => e.nombre.toLowerCase().includes(q) && !seleccionados[e.id]);
-
+    // Mostrar todos los que coinciden, marcando los ya seleccionados
+    var filtrados = todosEstudiantes.filter(e => e.nombre.toLowerCase().includes(q));
     if (filtrados.length === 0) {
-
         lista.innerHTML = '<div class="dropdown-item" style="color:#999">Sin resultados</div>';
-
     } else {
-
-        filtrados.forEach(e => {
-
+        filtrados.forEach(function(e) {
+            var eid = parseInt(e.id);
+            var yaSeleccionado = !!seleccionados[eid];
             var div = document.createElement('div');
-
             div.className = 'dropdown-item';
-
-            div.innerHTML = e.nombre + '<span class="subtexto">' + e.curso + '</span>';
-
-            div.addEventListener('click', function() {
-
-                agregarEstudiante(e.id, e.nombre, e.curso);
-
-                document.getElementById('buscador-nombre').value = '';
-
-                lista.style.display = 'none';
-
+            if (yaSeleccionado) {
+                div.style.cssText = 'background:#e8f5e9;border-left:3px solid #34a853';
+            }
+            div.innerHTML = (yaSeleccionado ? '✅ ' : '') + e.nombre
+                + '<span class="subtexto">' + e.curso + '</span>';
+            div.addEventListener('click', function(ev) {
+                ev.stopPropagation();
+                if (seleccionados[eid]) {
+                    quitarEstudiante(eid);
+                } else {
+                    agregarEstudiante(eid, e.nombre, e.curso);
+                }
+                // Refrescar dropdown sin cerrarlo
+                buscarPorNombre();
             });
-
             lista.appendChild(div);
-
         });
-
     }
-
     lista.style.display = 'block';
-
 }
 
 document.addEventListener('click', function(e) {
